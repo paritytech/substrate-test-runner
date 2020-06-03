@@ -14,9 +14,10 @@ sp-runtime = { git = "https://github.com/paritytech/substrate.git", branch = "td
 
 env_logger = "0.7.1"
 log = "0.4.8"
+futures = "0.3"
 
 # Calling RPC
 jsonrpc-core-client = { version = "14.2", features = ["ws"] }
+jsonrpc-core = "14.2"
 tokio = "0.1"
-futures = "0.1.26"
 url = "1.7"

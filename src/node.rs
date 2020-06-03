@@ -1,8 +1,3 @@
-use crate::RawRpcClient;
-use jsonrpc_core_client::RpcChannel;
-
-const RPC_WS_URL: &str = "ws://localhost:9944";
-
 #[derive(Debug)]
 pub enum Consensus {
     InstantSeal,
@@ -14,7 +9,10 @@ type ChainSpec = &'static str;
 
 #[derive(Debug)]
 pub struct SubstrateNode {
+    node_handle: Option<std::thread::JoinHandle<Result<(), sc_cli::Error>>>,
+    stop_signal: Option<futures::channel::oneshot::Sender<()>>,
 }
+
 impl SubstrateNode {
     pub fn builder() -> SubstrateNodeBuilder {
         let _ = env_logger::try_init();
@@ -26,32 +24,51 @@ impl SubstrateNode {
 
     pub fn new(
         cli: &[String],    
-        chain_spec: ChainSpec,
+        _chain_spec: ChainSpec,
     ) -> Self {
+        use futures::future::FutureExt;
         use sc_cli::SubstrateCli;
-        let cli = node_cli::cli::Cli::from_iter(cli.iter());
-        let runner = cli.create_runner(&cli.run).unwrap();
-        runner.run_node(
-            node_cli::service::new_light,
-            node_cli::service::new_full,
-            node_runtime::VERSION
-        );
-        Self {}
-    }
+        let (tx, rx) = futures::channel::oneshot::channel();
+        let (send_start, start) = std::sync::mpsc::channel();
+        let cli = node_cli::Cli::from_iter(cli.iter());
+        // TODO [ToDr] Get a handle of `AbstractService` instead
+        // (crate_configuration + new_light/new_full)
+        // it can be used to send RPC requests directly.
+        let handle = std::thread::spawn(move || {
+            let runner = cli.create_runner(&cli.run)
+                .expect("Unable to create Node runner.");
+            let _ = send_start.send(());
+            println!("Node is starting up.");
+            runner.run_node_until(
+                node_cli::service::new_light,
+                node_cli::service::new_full,
+                rx.map(|_| ())
+            )
+        });
 
-    pub fn raw_rpc(&mut self) -> RawRpcClient {
-        self.rpc()
-    }
+        // That's so crappy
+        start.recv().unwrap();
+        std::thread::sleep(std::time::Duration::from_secs(5));
 
-    pub fn rpc<TClient: From<RpcChannel> + Send + 'static>(&mut self) -> TClient {
-        use futures::prelude::*;
-        let (tx, rx) = std::sync::mpsc::channel();
-        let url = url::Url::parse(RPC_WS_URL).expect("URL is valid");
-        tokio::run(jsonrpc_core_client::transports::ws::connect(&url)
-            .map(move |client| tx.send(client).expect("Rx not dropped; qed"))
-            .map_err(|e| panic!("Unable to start WS client: {:?}", e))
-        );
-        rx.recv().expect("WS client was not able to connect.")
+        println!("Node built.");
+        Self {
+            node_handle: Some(handle),
+            stop_signal: Some(tx),
+        }
+    }
+}
+
+impl Drop for SubstrateNode {
+    fn drop(&mut self) {
+        println!("Killing node");
+        // TODO [ToDr] unwraps!
+        if let Some(signal) = self.stop_signal.take() {
+            signal.send(()).unwrap();
+        }
+        println!("Waiting for finish");
+        if let Some(handle) = self.node_handle.take() {
+            handle.join().unwrap().unwrap();
+        }
     }
 }
 
