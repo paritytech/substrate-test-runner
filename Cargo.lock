@@ -6740,6 +6740,7 @@ dependencies = [
  "log 0.4.8",
  "node-cli",
  "node-runtime",
+ "rand 0.7.3",
  "sc-cli",
  "sc-rpc-api",
  "sp-runtime",

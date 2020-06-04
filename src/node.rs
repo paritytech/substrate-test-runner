@@ -15,9 +15,42 @@ pub struct SubstrateNode {
 
 impl SubstrateNode {
     pub fn builder() -> SubstrateNodeBuilder {
-        let _ = env_logger::try_init();
+        let ignore = [
+            "yamux", "multistream_select", "libp2p",
+            "sc_network", "tokio_reactor", "jsonrpc_client_transports",
+            "ws", "sc_network::protocol::generic_proto::behaviour",
+            "sc_service", "sc_peerset"
+        ];
+        {
+            let mut builder = env_logger::builder();
+            builder.filter_level(log::LevelFilter::Debug);
+            for module in &ignore {
+                builder.filter(Some(module), log::LevelFilter::Info);
+            }
+
+            let _ = builder
+                .is_test(true)
+                .try_init();
+        }
+
+        // create random directory for database
+        let random_path = {
+            let dir: String = rand::Rng::sample_iter(
+                    rand::thread_rng(),
+                    &rand::distributions::Alphanumeric
+                )
+                .take(15)
+                .collect();
+            let path = format!("/tmp/substrate-test-runner/{}", dir);
+            std::fs::create_dir_all(&path).unwrap();
+            path
+        };
+
         SubstrateNodeBuilder {
-            cli: Default::default(),
+            cli: vec![
+                "--dev".into(),
+                format!("--base-path={}", random_path)
+            ],
             consensus: Consensus::InstantSeal,
         }
     }

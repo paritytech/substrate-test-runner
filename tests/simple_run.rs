@@ -25,5 +25,7 @@ fn should_run_off_chain_worker() {
 
     let header = chain_client.header(None).wait().unwrap();
     println!("{:?}", header);
+
+    node.wait_for_block(15);
 }
 
