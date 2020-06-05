@@ -1,28 +1,34 @@
 use crate::types;
+use std::convert::TryFrom;
 use jsonrpc_core_client::RpcChannel;
 use jsonrpc_core::futures::Future;
 
 pub use jsonrpc_core::types::params::Params;
 pub use jsonrpc_core_client::RawClient;
 
-pub type ChainClient = sc_rpc_api::chain::ChainClient<
-    types::BlockNumber,
-    types::BlockHash,
-    types::Header,
-    types::SignedBlock,
+pub type ChainClient<T> = sc_rpc_api::chain::ChainClient<
+    types::BlockNumber<T>,
+    types::BlockHash<T>,
+    types::Header<T>,
+    types::SignedBlock<T>,
 >;
 
 const RPC_WS_URL: &str = "ws://localhost:9944";
 
-pub trait RpcExtension {
+pub trait RpcExtension<T> {
     fn raw_rpc(&mut self) -> RawClient {
         self.rpc()
     }
 
     fn rpc<TClient: From<RpcChannel> + Send + 'static>(&mut self) -> TClient;
 
-    fn wait_for_block(&mut self, number: types::BlockNumber) {
-        let client = self.rpc::<ChainClient>();
+    fn wait_for_block(&mut self, number: impl Into<types::BlockNumber<T>>) where
+        // TODO The bound here is a bit shitty, cause in theory the RPC is not frame-specific.
+        T: frame_system::Trait,
+        types::BlockNumber<T>: TryFrom<primitive_types::U256> + Into<primitive_types::U256>,
+    {
+        let number = number.into();
+        let client = self.rpc::<ChainClient<T>>();
         let mut retry = 100;
         loop {
             let header = client.header(None).wait()
@@ -42,7 +48,7 @@ pub trait RpcExtension {
     }
 }
 
-impl RpcExtension for super::SubstrateNode {
+impl<T> RpcExtension<T> for super::SubstrateNode<T> {
     fn rpc<TClient: From<RpcChannel> + Send + 'static>(&mut self) -> TClient {
         use jsonrpc_core::futures::prelude::*;
         let (tx, rx) = std::sync::mpsc::channel();

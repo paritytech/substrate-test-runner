@@ -6734,12 +6734,15 @@ name = "substrate-test-runner"
 version = "0.1.0"
 dependencies = [
  "env_logger",
+ "frame-system",
  "futures 0.3.5",
  "jsonrpc-core",
  "jsonrpc-core-client",
  "log 0.4.8",
  "node-cli",
  "node-runtime",
+ "parking_lot 0.10.2",
+ "primitive-types",
  "rand 0.7.3",
  "sc-cli",
  "sc-rpc-api",
