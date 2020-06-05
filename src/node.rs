@@ -135,3 +135,101 @@ impl SubstrateNodeBuilder {
         )
     }
 }
+//
+// trait TestKind {}
+// struct SubstrateNode<T: TestKind>;
+//
+// enum NodeKind {
+//     ExternalOverWebSocket,
+//     ExternalOverHttp, 
+//     /// Addds the clean-state assumption
+//     Internal,
+// }
+//
+// struct BlackBox {
+//     node: NodeKind,
+//     client: Option<Box<_>>,
+// }
+// impl TestKind for BlackBox {}
+//
+// impl SubstrateNode<BlackBox> {
+//  pub fn wait_for_block() {}
+//  pub fn rpc<T>() -> T { todo!() }
+// }
+//
+// struct Deterministic {}
+// impl TestKind for Deterministic {}
+//
+// impl SubstrateNode<Deterministic> {
+//  pub fn create() {}
+//  pub fn assert_log_line() {}
+//  pub fn rpc<T>() -> T { todo!() }
+// } 
+
+// Substrate Repo
+// #[test]
+// fn balances_transfer_should_work() {
+//     let node = SubstrateNode::deterministic(node_cli::Service);
+// }
+//
+// fn generic_balances_transfer_test<T: NodeKind>(node: SubstrateNode<T, R>) {
+//
+// }
+//
+// #[test]
+// fn balances_transfer_should_work2() {
+//     generic_balances_transfer_test(SubstrateNode::deterministic(runtime));
+//
+//
+// // Polkadot Repo
+// #[test]
+// fn transfer_works() {
+//     let node = SubstrateNode::start_external(polkadot::Client);
+//     generic_balances_transfer_test(node);
+// }
+//
+//
+// // E2E Tests
+// #[test]
+// fn transfer_works() {
+//     generic_balances_transfer_test(
+//         SubstrateNode::external("ws://somenode:9944"),
+//         runtime_primitives,
+//     )
+// }
+//
+// trait RuntimePrimitivesTrait {
+//     type BlockNumber;
+//     type BlockHash;
+//     type Block =generic::Block<Header, OpaqueExtrinsic>;
+// }
+//
+// impl<T: frame_system::Trait> for RuntimePrimitivesTrait for T {
+//     type Block = T::Block;
+// }
+//
+// // decl_runtime!{} 
+// impl RuntimePrimitivesTrait for FrameRuntime {
+//
+// }
+//
+// //struct CustomRuntime;
+// impl RuntimePrimitivesTrait for CustomRuntime {
+//
+// }
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//

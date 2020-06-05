@@ -29,3 +29,10 @@ fn should_run_off_chain_worker() {
     node.wait_for_block(15);
 }
 
+// Check state using decl_storage
+// Assert a log line
+// Initially start with a "runtime example"
+// Customize the runtime somehow 
+//  $ cp node/runtime /tmp/temp_runtime
+//  $ sed -../
+
