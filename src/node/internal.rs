@@ -2,12 +2,6 @@ use std::io::Write;
 use std::sync::Arc;
 use parking_lot::RwLock;
 
-#[derive(Debug)]
-pub enum Consensus {
-    InstantSeal,
-    Manual,
-}
-
 /// TODO [ToDr] This should probably be a path to the chain spec file.
 type ChainSpec = &'static str;
 
@@ -15,15 +9,15 @@ type Module = String;
 type Logger = Arc<RwLock<std::collections::HashMap<Module, Vec<String>>>>;
 
 #[derive(Debug)]
-pub struct SubstrateNode<T> {
+pub struct Node<T> {
     node_handle: Option<std::thread::JoinHandle<Result<(), sc_cli::Error>>>,
     stop_signal: Option<futures::channel::oneshot::Sender<()>>,
     logs: Logger,
     runtime: T,
 }
 
-impl<T> SubstrateNode<T> {
-    pub fn builder(runtime: T) -> SubstrateNodeBuilder<T> {
+impl<T> Node<T> {
+    pub fn builder(runtime: T) -> NodeBuilder<T> {
         let ignore = [
             "yamux", "multistream_select", "libp2p",
             "sc_network", "tokio_reactor", "jsonrpc_client_transports",
@@ -67,7 +61,7 @@ impl<T> SubstrateNode<T> {
             path
         };
 
-        SubstrateNodeBuilder {
+        NodeBuilder {
             cli: vec![
                 "--dev".into(),
                 "--no-mdns".into(),
@@ -76,7 +70,6 @@ impl<T> SubstrateNode<T> {
                 format!("--base-path={}", random_path)
             ],
             logs,
-            consensus: Consensus::InstantSeal,
             runtime,
         }
     }
@@ -108,7 +101,7 @@ impl<T> SubstrateNode<T> {
 
         // That's so crappy
         start.recv().unwrap();
-        std::thread::sleep(std::time::Duration::from_secs(5));
+        // std::thread::sleep(std::time::Duration::from_secs(5));
 
         Self {
             node_handle: Some(handle),
@@ -132,7 +125,7 @@ impl<T> SubstrateNode<T> {
     }
 }
 
-impl<T> Drop for SubstrateNode<T> {
+impl<T> Drop for NodeBuilder<T> {
     fn drop(&mut self) {
         // TODO [ToDr] unwraps!
         if let Some(signal) = self.stop_signal.take() {
@@ -145,32 +138,24 @@ impl<T> Drop for SubstrateNode<T> {
 }
 
 #[derive(Debug)]
-pub struct SubstrateNodeBuilder<T> {
+pub struct NodeBuilder<T> {
     /// Parameters passed as-is.
     cli: Vec<String>,
-    /// TODO [ToDr] This should be used to construct a special chainspec file.
-    consensus: Consensus,
     logs: Logger,
     runtime: T,
 }
 
-impl<T> SubstrateNodeBuilder<T> {
+impl<T> NodeBuilder<T> {
     pub fn cli_param(mut self, param: &str) -> Self {
         self.cli.push(param.into());
         self
     }
 
-    pub fn consensus(mut self, consensus: Consensus) -> Self {
-        log::warn!("Changing consensus is a no-op currently.");
-        self.consensus = consensus;
-        self
-    }
-
-    pub fn start(self) -> SubstrateNode<T> {
+    pub fn start(self) -> Node<T> {
         // TODO [ToDr] Actaully create the chainspec.
         let chain_spec = "dev";
 
-        SubstrateNode::new(
+        Node::new(
             self.logs,
             &self.cli,
             self.runtime,
@@ -178,101 +163,4 @@ impl<T> SubstrateNodeBuilder<T> {
         )
     }
 }
-//
-// trait TestKind {}
-// struct SubstrateNode<T: TestKind>;
-//
-// enum NodeKind {
-//     ExternalOverWebSocket,
-//     ExternalOverHttp, 
-//     /// Addds the clean-state assumption
-//     Internal,
-// }
-//
-// struct BlackBox {
-//     node: NodeKind,
-//     client: Option<Box<_>>,
-// }
-// impl TestKind for BlackBox {}
-//
-// impl SubstrateNode<BlackBox> {
-//  pub fn wait_for_block() {}
-//  pub fn rpc<T>() -> T { todo!() }
-// }
-//
-// struct Deterministic {}
-// impl TestKind for Deterministic {}
-//
-// impl SubstrateNode<Deterministic> {
-//  pub fn create() {}
-//  pub fn assert_log_line() {}
-//  pub fn rpc<T>() -> T { todo!() }
-// } 
 
-// Substrate Repo
-// #[test]
-// fn balances_transfer_should_work() {
-//     let node = SubstrateNode::deterministic(node_cli::Service);
-// }
-//
-// fn generic_balances_transfer_test<T: NodeKind>(node: SubstrateNode<T, R>) {
-//
-// }
-//
-// #[test]
-// fn balances_transfer_should_work2() {
-//     generic_balances_transfer_test(SubstrateNode::deterministic(runtime));
-//
-//
-// // Polkadot Repo
-// #[test]
-// fn transfer_works() {
-//     let node = SubstrateNode::start_external(polkadot::Client);
-//     generic_balances_transfer_test(node);
-// }
-//
-//
-// // E2E Tests
-// #[test]
-// fn transfer_works() {
-//     generic_balances_transfer_test(
-//         SubstrateNode::external("ws://somenode:9944"),
-//         runtime_primitives,
-//     )
-// }
-//
-// trait RuntimePrimitivesTrait {
-//     type BlockNumber;
-//     type BlockHash;
-//     type Block =generic::Block<Header, OpaqueExtrinsic>;
-// }
-//
-// impl<T: frame_system::Trait> for RuntimePrimitivesTrait for T {
-//     type Block = T::Block;
-// }
-//
-// // decl_runtime!{} 
-// impl RuntimePrimitivesTrait for FrameRuntime {
-//
-// }
-//
-// //struct CustomRuntime;
-// impl RuntimePrimitivesTrait for CustomRuntime {
-//
-// }
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
