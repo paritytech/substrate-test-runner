@@ -19,6 +19,12 @@ pub struct InternalNode<T> {
     runtime: T,
 }
 
+impl<T> From<T> for InternalNode<T> {
+    fn from(runtime: T) -> Self {
+        InternalNodeBuilder::new(runtime).start()
+    }
+}
+
 impl<T> InternalNode<T> {
     pub fn builder(runtime: T) -> InternalNodeBuilder<T> {
         InternalNodeBuilder::new(runtime)
@@ -84,6 +90,12 @@ pub struct InternalNodeBuilder<T> {
     cli: Vec<String>,
     logs: Logger,
     runtime: T,
+}
+
+impl<T> From<InternalNodeBuilder<T>> for InternalNode<T> {
+    fn from(builder: InternalNodeBuilder<T>) -> Self {
+        builder.start()
+    }
 }
 
 impl<T> InternalNodeBuilder<T> {

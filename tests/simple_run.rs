@@ -5,11 +5,12 @@ use node_runtime::Runtime;
 
 #[test]
 fn should_run_off_chain_worker() {
-    let node = test::node(Runtime)
-        // TODO [ToDr] This does not work properly, since we have a shared logger.
-        .cli_param("-lsc_offchain=trace") 
-        .start();
-    let mut test = test::deterministic(node);
+    let mut test = test::deterministic(
+        test::node(Runtime)
+            // TODO [ToDr] This does not work properly, since we have a shared logger.
+            .cli_param("-lsc_offchain=trace") 
+            .start()
+    );
 
     let chain_client = test.rpc::<rpc::ChainClient<Runtime>>();
     let rpc_client = test.raw_rpc();
@@ -32,9 +33,7 @@ fn should_run_off_chain_worker() {
 
 #[test]
 fn should_read_state() {
-    let node = test::node(Runtime)
-        .start();
-    let mut test = test::deterministic(node);
+    let mut test = test::deterministic(Runtime.into());
     test.wait_for_block(5_u32);
 }
 
