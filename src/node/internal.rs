@@ -2,6 +2,9 @@ use std::io::Write;
 use std::sync::Arc;
 use parking_lot::RwLock;
 
+/// TODO [ToDr] Remove in favour of direct use of `AbstractService`.
+pub const RPC_WS_URL: &str = "ws://127.0.0.1:9944";
+
 /// TODO [ToDr] This should probably be a path to the chain spec file.
 type ChainSpec = &'static str;
 
@@ -125,7 +128,7 @@ impl<T> Node<T> {
     }
 }
 
-impl<T> Drop for NodeBuilder<T> {
+impl<T> Drop for Node<T> {
     fn drop(&mut self) {
         // TODO [ToDr] unwraps!
         if let Some(signal) = self.stop_signal.take() {

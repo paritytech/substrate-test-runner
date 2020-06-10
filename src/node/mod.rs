@@ -1,12 +1,26 @@
 use jsonrpc_core_client::{RpcChannel, RawClient};
 
 pub mod internal;
+pub mod blackbox;
+pub mod deterministic;
 
-pub enum BlackBoxNode<T> {
-    // Connects to an external node.
-    External(String),
-    // Spawns a pristine node.
-    Internal(internal::Node<T>),
+fn rpc_connect_ws<TClient: From<RpcChannel> + Send + 'static>(url: &str) -> TClient {
+    use jsonrpc_core::futures::prelude::*;
+    let (tx, rx) = std::sync::mpsc::channel();
+    let url = url::Url::parse(url).expect("URL is valid");
+    println!("Connecting to RPC at {}", url);
+    std::thread::spawn(move || {
+        tokio::run(jsonrpc_core_client::transports::ws::connect(&url)
+            .map(move |client| {
+                println!("Client built, sending.");
+                tx.send(client).expect("Rx not dropped; qed");
+                println!("Sent.");
+            })
+            .map_err(|e| panic!("Unable to start WS client: {:?}", e))
+        );
+    });
+    println!("Waiting for the client");
+    rx.recv().expect("WS client was not able to connect.")
 }
 
 pub trait TestKind {
@@ -14,68 +28,18 @@ pub trait TestKind {
         self.rpc()
     }
 
-    fn rpc<TClient: From<RpcChannel> + Send + 'static>(&mut self) -> TClient {
-
-    }
+    fn rpc<TClient: From<RpcChannel> + Send + 'static>(&mut self) -> TClient;
 }
-
-/// A black box test.
-pub struct BlackBox<T> {
-    node: BlackBoxNode<T>,
-}
-
-/// A deterministic internal instance of substrate node.
-pub struct Deterministic<T> {
-    node: internal::Node<T>,
-}
-
-impl<T> TestKind for Deterministic<T> {}
 
 pub struct TestNode<T> {
     test: T,
 }
 
-impl<T> TestNode {
+impl<T> TestNode<T> {
     pub fn new(test: T) -> Self {
         Self { test }
     }
 }
-
-impl<T> TestNode<Deterministic<T>> {}
-    pub fn deterministic(node: internal::Node<T>) -> Self {
-        TestNode {
-            test: Deterministic { node },
-        }
-    }   
-}
-
-impl<T> std::ops::Deref for TestNode<Deterministic<T>> {
-    type Target = internal::Node<T>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.test.node
-    }
-}
-
-impl<T> std::ops::DerefMut for TestNode<Deterministic<T>> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.test.node
-    }
-}
-
-impl<T> TestNode<BlackBox<T>> {
-    pub fn black_box(node: BlackBoxNode<T>) -> Self {
-        TestNode {
-            test: BlackBox { node },
-        }
-    }
-
-    /// Wait `number` of blocks.
-    pub fn wait_blocks(&self, number: impl Into<types::BlockNumber<T>>) {
-        todo!()
-    }
-}
-
 
 // Substrate Repo
 // #[test]
