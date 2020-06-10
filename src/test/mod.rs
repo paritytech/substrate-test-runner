@@ -1,44 +1,24 @@
-use jsonrpc_core_client::{RpcChannel, RawClient};
-
-pub mod internal;
 pub mod blackbox;
 pub mod deterministic;
 
-fn rpc_connect_ws<TClient: From<RpcChannel> + Send + 'static>(url: &str) -> TClient {
-    use jsonrpc_core::futures::prelude::*;
-    let (tx, rx) = std::sync::mpsc::channel();
-    let url = url::Url::parse(url).expect("URL is valid");
-    println!("Connecting to RPC at {}", url);
-    std::thread::spawn(move || {
-        tokio::run(jsonrpc_core_client::transports::ws::connect(&url)
-            .map(move |client| {
-                println!("Client built, sending.");
-                tx.send(client).expect("Rx not dropped; qed");
-                println!("Sent.");
-            })
-            .map_err(|e| panic!("Unable to start WS client: {:?}", e))
-        );
-    });
-    println!("Waiting for the client");
-    rx.recv().expect("WS client was not able to connect.")
+/// A base trait for shared part of every kind of substrate test.
+pub trait SubstrateTest: crate::rpc::RpcExtension {}
+
+pub fn blackbox_external<TRuntime>(url: &str, _runtime: TRuntime) -> blackbox::BlackBox<TRuntime> {
+    blackbox::BlackBox::new(blackbox::BlackBoxNode::External(url.into()))
 }
 
-pub trait TestKind {
-    fn raw_rpc(&mut self) -> RawClient {
-        self.rpc()
-    }
-
-    fn rpc<TClient: From<RpcChannel> + Send + 'static>(&mut self) -> TClient;
+pub fn blackbox_internal<TRuntime>(runtime: TRuntime) -> blackbox::BlackBox<TRuntime> {
+    let node = crate::node::InternalNode::builder(runtime).start();
+    blackbox::BlackBox::new(blackbox::BlackBoxNode::Internal(node))
 }
 
-pub struct TestNode<T> {
-    test: T,
+pub fn deterministic<TRuntime>(node: crate::node::InternalNode<TRuntime>) -> deterministic::Deterministic<TRuntime> {
+    deterministic::Deterministic::new(node)
 }
 
-impl<T> TestNode<T> {
-    pub fn new(test: T) -> Self {
-        Self { test }
-    }
+pub fn node<TRuntime>(runtime: TRuntime) -> crate::node::InternalNodeBuilder<TRuntime> {
+    crate::node::InternalNode::builder(runtime)
 }
 
 // Substrate Repo
@@ -92,19 +72,3 @@ impl<T> TestNode<T> {
 // impl RuntimePrimitivesTrait for CustomRuntime {
 //
 // }
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
