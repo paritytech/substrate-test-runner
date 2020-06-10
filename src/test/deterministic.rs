@@ -40,13 +40,15 @@ impl<TRuntime: frame_system::Trait> Deterministic<TRuntime> {
 
     /// TODO [ToDr] This method should probably be `produce_blocks(5)` when we switch to
     /// `ManualConsensus` engine.
-    pub fn wait_for_block(&mut self, number: impl Into<crate::types::BlockNumber<TRuntime>>) where
+    pub fn produce_blocks(&mut self, diff: impl Into<crate::types::BlockNumber<TRuntime>>) where
        // TODO The bound here is a bit shitty, cause in theory the RPC is not frame-specific.
         crate::types::BlockNumber<TRuntime>: std::convert::TryFrom<primitive_types::U256> + Into<primitive_types::U256>,
     {
+        // TODO [ToDr] Read from the chain.
+        let current_block_number: crate::types::BlockNumber<TRuntime> = 0.into();
         use jsonrpc_core::futures::Future;
 
-        let number = number.into();
+        let number = current_block_number + diff.into();
         let client = self.rpc::<crate::rpc::ChainClient<TRuntime>>();
         let mut retry = 100;
         loop {

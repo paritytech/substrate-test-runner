@@ -9,10 +9,10 @@ fn should_run_off_chain_worker() {
         test::node(Runtime)
             // TODO [ToDr] This does not work properly, since we have a shared logger.
             .cli_param("-lsc_offchain=trace") 
-            .with_sudo(Keyring::Alice)
-            .with_genesis_state(|| {
-                ...
-            })
+            // .with_sudo(Keyring::Alice)
+            // .with_genesis_state(|| {
+            //     ...
+            // })
             .start()
     );
 
@@ -30,7 +30,7 @@ fn should_run_off_chain_worker() {
     let header = chain_client.header(None).wait().unwrap();
     println!("{:?}", header);
 
-    test.wait_for_block(15_u32);
+    test.produce_blocks(15_u32);
 
     test.assert_log_line("db", "best = true");
 }
@@ -61,7 +61,6 @@ fn should_read_state() {
 
     // when
     test.produce_blocks(5_u32);
-    test.send_transfer(Alice, Bob);
     test.with_state(|| {
     // test.with_state(Read::External, Write::Memory(&mut storage), || {
         let events = frame_system::Module::<Runtime>::events();
