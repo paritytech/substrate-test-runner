@@ -6746,7 +6746,9 @@ dependencies = [
  "rand 0.7.3",
  "sc-cli",
  "sc-rpc-api",
+ "sp-externalities",
  "sp-runtime",
+ "sp-storage",
  "tokio 0.1.22",
  "url 1.7.2",
 ]

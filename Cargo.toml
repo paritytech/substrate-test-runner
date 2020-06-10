@@ -26,3 +26,7 @@ jsonrpc-core = "14.2"
 tokio = "0.1"
 url = "1.7"
 primitive-types = "0.7"
+
+# Externalities
+sp-externalities = { git = "https://github.com/paritytech/substrate.git", branch = "td-test-runner" }
+sp-storage = { git = "https://github.com/paritytech/substrate.git", branch = "td-test-runner" }

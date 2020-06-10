@@ -36,8 +36,10 @@ fn should_read_state() {
     let mut test = test::deterministic(Runtime.into());
     test.wait_for_block(5_u32);
 
-    let events = frame_system::Module::<Runtime>::events();
-    assert_eq!(events.len(), 0);
+    test.with_runtime(|| {
+        let events = frame_system::Module::<Runtime>::events();
+        assert_eq!(events.len(), 1);
+    });
 }
 
 #[test]
