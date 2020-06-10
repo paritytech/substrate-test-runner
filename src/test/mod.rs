@@ -4,7 +4,7 @@ pub mod externalities;
 
 /// A base trait for shared part of every kind of substrate test.
 pub trait SubstrateTest<TRuntime>: crate::rpc::RpcExtension {
-    fn with_runtime<R>(&mut self, closure: impl FnOnce() -> R) -> R where TRuntime: frame_system::Trait {
+    fn with_state<R>(&mut self, closure: impl FnOnce() -> R) -> R where TRuntime: frame_system::Trait {
         externalities::TestExternalities::<TRuntime>::new(
             self.rpc()
         ).execute_with(closure)

@@ -45,8 +45,7 @@ impl sp_externalities::Externalities for Ext {
 	fn set_offchain_storage(&mut self, key: &[u8], value: Option<&[u8]>) { todo!() }
 
 	fn storage(&self, key: &[u8]) -> Option<Vec<u8>> {
-        println!("Reading: {:?}", std::str::from_utf8(key));
-        None
+        Some(vec![1, 2, 3])
     }
 
 	fn storage_hash(&self, key: &[u8]) -> Option<Vec<u8>> { todo!() }
@@ -81,7 +80,10 @@ impl sp_externalities::Externalities for Ext {
 		prefix: &[u8],
 	) { todo!() }
 
-	fn place_storage(&mut self, key: Vec<u8>, value: Option<Vec<u8>>) { todo!() }
+	fn place_storage(&mut self, key: Vec<u8>, value: Option<Vec<u8>>) {
+        // Create a sudo transaction that alters storage on-chain.
+        todo!()
+    }
 
 	fn place_child_storage(
 		&mut self,

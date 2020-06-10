@@ -9,6 +9,10 @@ fn should_run_off_chain_worker() {
         test::node(Runtime)
             // TODO [ToDr] This does not work properly, since we have a shared logger.
             .cli_param("-lsc_offchain=trace") 
+            .with_sudo(Keyring::Alice)
+            .with_genesis_state(|| {
+                ...
+            })
             .start()
     );
 
@@ -33,12 +37,51 @@ fn should_run_off_chain_worker() {
 
 #[test]
 fn should_read_state() {
+    // given
     let mut test = test::deterministic(Runtime.into());
-    test.wait_for_block(5_u32);
+    // test.send_transaction()
+    //     .to_module("System")
+    //     .call("set_heap_pages")
+    //     .origin(Root)
+    //     .send();
 
-    test.with_runtime(|| {
+    // test.with_state(Read::Memory(&map), Write::Sudo, || {
+    //   my_pallet::test_conditions(1)
+    // });
+    //
+    // let balance_call = balances_helper().tranfser(Alice, Bob);
+    // test.read_state(|| {
+    //     <Runtime as CreateTransaction>::create_transaction(
+    //         balance_call,
+    //         signer,
+    //         account,
+    //         nonce,
+    //     )
+    // });
+
+    // when
+    test.produce_blocks(5_u32);
+    test.send_transfer(Alice, Bob);
+    test.with_state(|| {
+    // test.with_state(Read::External, Write::Memory(&mut storage), || {
         let events = frame_system::Module::<Runtime>::events();
         assert_eq!(events.len(), 1);
+
+        let events = frame_system::Module::<Runtime>::events();
+        assert_eq!(events.len(), 1);
+    });
+
+    // when
+    test.produce_blocks(5_u32);
+
+    // then
+    test.with_state(|| {
+    // test.with_state(Read::External, Write::Memory(&mut storage), || {
+        let events = frame_system::Module::<Runtime>::events();
+        assert_eq!(events.len(), 0);
+
+        let events = frame_system::Module::<Runtime>::events();
+        assert_eq!(events.len(), 0);
     });
 }
 
