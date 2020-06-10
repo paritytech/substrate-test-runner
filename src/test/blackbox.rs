@@ -26,7 +26,7 @@ impl<TRuntime> rpc::RpcExtension for BlackBox<TRuntime> {
     }
 }
 
-impl<TRuntime> crate::SubstrateTest for BlackBox<TRuntime> {}
+impl<TRuntime> crate::test::SubstrateTest for BlackBox<TRuntime> {}
 
 impl<TRuntime> BlackBox<TRuntime> {
     pub fn new(node: BlackBoxNode<TRuntime>) -> Self {

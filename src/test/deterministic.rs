@@ -16,7 +16,7 @@ impl<TRuntime> rpc::RpcExtension for Deterministic<TRuntime> {
     }
 }
 
-impl<TRuntime> crate::SubstrateTest for Deterministic<TRuntime> {}
+impl<TRuntime> crate::test::SubstrateTest for Deterministic<TRuntime> {}
 
 impl<TRuntime> Deterministic<TRuntime> {
     pub fn new(node: InternalNode<TRuntime>) -> Self {

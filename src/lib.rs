@@ -3,4 +3,7 @@ pub mod rpc;
 pub mod test;
 pub mod types;
 
-pub use test::*;
+pub mod prelude {
+    pub use super::test::*;
+    pub use super::rpc::RpcExtension;
+}

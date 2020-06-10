@@ -1,4 +1,4 @@
-use substrate_test_runner::{test, rpc::{self, RpcExtension}, SubstrateTest};
+use substrate_test_runner::{test, rpc, prelude::*};
 use jsonrpc_core::futures::Future;
 use node_runtime::Runtime;
 
@@ -35,6 +35,9 @@ fn should_run_off_chain_worker() {
 fn should_read_state() {
     let mut test = test::deterministic(Runtime.into());
     test.wait_for_block(5_u32);
+
+    let events = frame_system::Module::<Runtime>::events();
+    assert_eq!(events.len(), 0);
 }
 
 #[test]
