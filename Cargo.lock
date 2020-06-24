@@ -222,6 +222,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "async-trait"
+version = "0.1.36"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a265e3abeffdce30b2e26b7a11b222fe37c6067404001b434101457d0385eb92"
+dependencies = [
+ "proc-macro2",
+ "quote 1.0.6",
+ "syn 1.0.30",
+]
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3318,9 +3329,9 @@ checksum = "77af24da69f9d9341038eba93a073b1fdaaa1b788221b00a69bce9e762cb32de"
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.57"
+version = "0.9.58"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7410fef80af8ac071d4f63755c0ab89ac3df0fd1ea91f1d1f37cf5cec4395990"
+checksum = "a842db4709b604f0fe5d1170ae3565899be2ad3d9cbc72dedc789ac0511f78de"
 dependencies = [
  "autocfg 1.0.0",
  "cc",
@@ -6733,9 +6744,12 @@ dependencies = [
 name = "substrate-test-runner"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "env_logger",
  "frame-system",
+ "futures 0.1.29",
  "futures 0.3.5",
+ "hyper 0.12.35",
  "jsonrpc-core",
  "jsonrpc-core-client",
  "log 0.4.8",
@@ -6749,7 +6763,8 @@ dependencies = [
  "sp-externalities",
  "sp-runtime",
  "sp-storage",
- "tokio 0.1.22",
+ "tokio 0.2.21",
+ "tokio-compat",
  "url 1.7.2",
 ]
 
@@ -7111,6 +7126,23 @@ dependencies = [
  "bytes 0.4.12",
  "futures 0.1.29",
  "tokio-io",
+]
+
+[[package]]
+name = "tokio-compat"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "107b625135aa7b9297dd2d99ccd6ca6ab124a5d1230778e159b9095adca4c722"
+dependencies = [
+ "futures 0.1.29",
+ "futures-core",
+ "futures-util",
+ "pin-project-lite",
+ "tokio 0.2.21",
+ "tokio-current-thread",
+ "tokio-executor 0.1.10",
+ "tokio-reactor",
+ "tokio-timer",
 ]
 
 [[package]]

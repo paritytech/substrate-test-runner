@@ -76,10 +76,13 @@ impl<T> Drop for InternalNode<T> {
     fn drop(&mut self) {
         // TODO [ToDr] unwraps!
         if let Some(signal) = self.stop_signal.take() {
-            signal.send(()).unwrap();
+            if let Err(_) = signal.send(()) {
+				log::error!("couldn't send signal to node to terminate")
+			}
         }
         if let Some(handle) = self.node_handle.take() {
-            handle.join().unwrap().unwrap();
+			let result = handle.join();
+			log::error!("node terminated with {:?}", result)
         }
     }
 }

@@ -16,14 +16,18 @@ frame-system = { git = "https://github.com/paritytech/substrate.git", branch = "
 
 env_logger = "0.7.1"
 log = "0.4.8"
-futures = "0.3"
+hyper = "0.12.35"
+futures01 = { package = "futures", version = "0.1.29" }
+futures = { package = "futures", version = "0.3", features = ["compat"] }
 rand = "0.7"
 parking_lot = "0.10"
+tokio = { version = "0.2", features = ["time"] }
+async-trait = "0.1.36"
 
 # Calling RPC
 jsonrpc-core-client = { version = "14.2", features = ["ws"] }
 jsonrpc-core = "14.2"
-tokio = "0.1"
+tokio-compat = { version = "0.1.6", features = ["rt-full"] }
 url = "1.7"
 primitive-types = "0.7"
 

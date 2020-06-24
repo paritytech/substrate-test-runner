@@ -2,25 +2,16 @@ pub mod blackbox;
 pub mod deterministic;
 pub mod externalities;
 
-/// A base trait for shared part of every kind of substrate test.
-pub trait SubstrateTest<TRuntime>: crate::rpc::RpcExtension {
-    fn with_state<R>(&mut self, closure: impl FnOnce() -> R) -> R where TRuntime: frame_system::Trait {
-        externalities::TestExternalities::<TRuntime>::new(
-            self.rpc()
-        ).execute_with(closure)
-    }
-}
-
-pub fn blackbox_external<TRuntime>(url: &str, _runtime: TRuntime) -> blackbox::BlackBox<TRuntime> {
+pub fn blackbox_external<TRuntime: Send>(url: &str, _runtime: TRuntime) -> blackbox::BlackBox<TRuntime> {
     blackbox::BlackBox::new(blackbox::BlackBoxNode::External(url.into()))
 }
 
-pub fn blackbox_internal<TRuntime>(runtime: TRuntime) -> blackbox::BlackBox<TRuntime> {
+pub fn blackbox_internal<TRuntime: Send>(runtime: TRuntime) -> blackbox::BlackBox<TRuntime> {
     let node = crate::node::InternalNode::builder(runtime).start();
     blackbox::BlackBox::new(blackbox::BlackBoxNode::Internal(node))
 }
 
-pub fn deterministic<TRuntime>(node: crate::node::InternalNode<TRuntime>) -> deterministic::Deterministic<TRuntime> {
+pub fn deterministic<TRuntime: Send>(node: crate::node::InternalNode<TRuntime>) -> deterministic::Deterministic<TRuntime> {
     deterministic::Deterministic::new(node)
 }
 
