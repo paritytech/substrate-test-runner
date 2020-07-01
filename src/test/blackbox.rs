@@ -3,9 +3,10 @@ use crate::{
     rpc::{self, RpcExtension},
     types,
 };
-use jsonrpc_core_client::RpcChannel;
+use jsonrpc_core_client::{RpcChannel, transports::local};
 use async_trait::async_trait;
-use crate::test::externalities;
+use crate::test::externalities::TestExternalities;
+use tokio_compat::runtime::Runtime;
 
 pub enum BlackBoxNode<TRuntime> {
     /// Connects to an external node.
@@ -17,32 +18,39 @@ pub enum BlackBoxNode<TRuntime> {
 /// A black box test.
 pub struct BlackBox<TRuntime> {
     node: BlackBoxNode<TRuntime>,
+    compat_runtime: Runtime,
 }
 
-impl<TRuntime: Send> BlackBox<TRuntime> {
+impl<TRuntime: Send + Sync> BlackBox<TRuntime> {
     pub async fn with_state<R>(&mut self, closure: impl FnOnce() -> R) -> R where TRuntime: frame_system::Trait {
-        externalities::TestExternalities::<TRuntime>::new(
-            self.rpc().await
-        ).execute_with(closure)
+        TestExternalities::<TRuntime>::new(self.rpc())
+            .execute_with(closure)
     }
 }
 
-#[async_trait]
 impl<TRuntime: Send> rpc::RpcExtension for BlackBox<TRuntime> {
-    async fn rpc<TClient: From<RpcChannel>>(&mut self) -> TClient {
-        let future = match self.node {
-            BlackBoxNode::External(ref url) => rpc::connect_ws(&url),
-            BlackBoxNode::Internal(_) => rpc::connect_ws(crate::node::RPC_WS_URL),
+    fn rpc<TClient: From<RpcChannel> + 'static>(&mut self) -> TClient {
+        let client = match self.node {
+            BlackBoxNode::External(ref url) => {
+                self.compat_runtime.block_on_std( rpc::connect_ws(&url)).unwrap()
+            },
+            BlackBoxNode::Internal(ref internal) => {
+                use futures01::Future;
+
+                let (client, fut) = local::connect::<TClient, _, _>(internal.rpc_handler());
+                self.compat_runtime.spawn(fut.map_err(|_| ()));
+                client
+            },
 		};
-        future.await
-            .unwrap()
+        client
     }
 }
 
 
 impl<TRuntime> BlackBox<TRuntime> {
     pub fn new(node: BlackBoxNode<TRuntime>) -> Self {
-        Self { node }
+        let runtime = Runtime::new().unwrap();
+        Self { node, compat_runtime: runtime }
     }
 }
 

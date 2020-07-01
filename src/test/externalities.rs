@@ -14,7 +14,6 @@ impl<TRuntime: frame_system::Trait> TestExternalities<TRuntime> {
     }
 
 	pub fn execute_with<R>(&mut self, execute: impl FnOnce() -> R) -> R {
-		println!("execute_with");
 		sp_externalities::set_and_run_with_externalities(self, execute)
 	}
 }
@@ -111,7 +110,31 @@ impl<TRuntime: frame_system::Trait> sp_externalities::Externalities for TestExte
 
 	fn storage_changes_root(&mut self, _parent: &[u8]) -> Result<Option<Vec<u8>>, ()> { todo!() }
 
+	fn storage_start_transaction(&mut self) {
+		todo!()
+	}
+
+	fn storage_rollback_transaction(&mut self) -> Result<(), ()> {
+		todo!()
+	}
+
+	fn storage_commit_transaction(&mut self) -> Result<(), ()> {
+		todo!()
+	}
+
 	fn wipe(&mut self) { todo!() }
 
 	fn commit(&mut self) { todo!() }
+
+	fn read_write_count(&self) -> (u32, u32, u32, u32) {
+		todo!()
+	}
+
+	fn reset_read_write_count(&mut self) {
+		todo!()
+	}
+
+	fn set_whitelist(&mut self, new: Vec<Vec<u8>>) {
+		todo!()
+	}
 }

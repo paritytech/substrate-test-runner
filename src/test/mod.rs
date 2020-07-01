@@ -6,12 +6,12 @@ pub fn blackbox_external<TRuntime: Send>(url: &str, _runtime: TRuntime) -> black
     blackbox::BlackBox::new(blackbox::BlackBoxNode::External(url.into()))
 }
 
-pub fn blackbox_internal<TRuntime: Send>(runtime: TRuntime) -> blackbox::BlackBox<TRuntime> {
+pub fn blackbox_internal<TRuntime: Send + Sync>(runtime: TRuntime) -> blackbox::BlackBox<TRuntime> {
     let node = crate::node::InternalNode::builder(runtime).start();
     blackbox::BlackBox::new(blackbox::BlackBoxNode::Internal(node))
 }
 
-pub fn deterministic<TRuntime: Send>(node: crate::node::InternalNode<TRuntime>) -> deterministic::Deterministic<TRuntime> {
+pub fn deterministic<TRuntime: Send + Sync>(node: crate::node::InternalNode<TRuntime>) -> deterministic::Deterministic<TRuntime> {
     deterministic::Deterministic::new(node)
 }
 

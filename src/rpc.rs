@@ -18,13 +18,12 @@ pub type StateClient<T> = sc_rpc_api::state::StateClient<
     types::BlockHash<T>,
 >;
 
-#[async_trait]
 pub trait RpcExtension {
-    async fn raw_rpc(&mut self) -> RawClient {
-        self.rpc().await
+    fn raw_rpc(&mut self) -> RawClient {
+        self.rpc()
     }
 
-    async fn rpc<TClient: From<RpcChannel>>(&mut self) -> TClient;
+    fn rpc<TClient: From<RpcChannel> + 'static>(&mut self) -> TClient;
 }
 
 pub async fn connect_ws<TClient: From<RpcChannel>>(url: &str) -> Result<TClient, RpcError>

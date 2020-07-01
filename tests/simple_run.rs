@@ -1,6 +1,5 @@
 use substrate_test_runner::{test, rpc, prelude::*};
-use node_runtime::Runtime;
-use tokio_compat::runtime;
+use runtime::Runtime;
 use futures::compat::Future01CompatExt;
 
 #[test]
@@ -15,10 +14,10 @@ fn should_run_off_chain_worker() {
             // })
             .start()
     );
-    let mut runtime = runtime::Runtime::new().unwrap();
+    let mut runtime = tokio_compat::runtime::Runtime::new().unwrap();
     runtime.block_on_std(async {
-        let chain_client = test.rpc::<rpc::ChainClient<Runtime>>().await;
-        let rpc_client = test.raw_rpc().await;
+        let chain_client = test.rpc::<rpc::ChainClient<Runtime>>();
+        let rpc_client = test.raw_rpc();
 
         // TODO [ToDr] This should be even rawer - allowing to pass JSON call,
         // which in turn could be collected from the UI.
@@ -31,7 +30,7 @@ fn should_run_off_chain_worker() {
         let header = chain_client.header(None).compat().await.unwrap();
         println!("{:?}", header);
 
-        test.produce_blocks(15_u32).await;
+        test.produce_blocks(15);
 
         // test.assert_log_line("db", "best = true");
     });
@@ -60,40 +59,35 @@ fn should_read_state() {
     //         nonce,
     //     )
     // });
+    println!("produce_blocks");
 
-    let mut runtime = runtime::Runtime::new().unwrap();
-
-    // tokio-compat doesn't have macros for test, main.
-    // would be great to have them.
-    runtime.block_on_std(async {
-        // when
-        test.produce_blocks(5_u32).await;
-        println!("produced blocks");
-        test.with_state(|| {
-            // test.with_state(Read::External, Write::Memory(&mut storage), || {
-            let events = frame_system::Module::<Runtime>::events();
-            println!("events {:#?}", events);
-            // assert_eq!(events.len(), 2);
-            //
-            let events = frame_system::Module::<Runtime>::events();
-            println!("events {:#?}", events);
-            // assert_eq!(events.len(), 1);
-        }).await;
-
-        // when
-        test.produce_blocks(5_u32).await;
-
-        // then
-        test.with_state(|| {
-            let events = frame_system::Module::<Runtime>::events();
-            println!("events {:#?}", events);
-            // assert_eq!(events.len(), 0);
-
-            let events = frame_system::Module::<Runtime>::events();
-            println!("events {:#?}", events);
-            // assert_eq!(events.len(), 0);
-        }).await;
-    });
+    // when
+    test.produce_blocks(1);
+    println!("produced blocks");
+    // test.with_state(|| {
+    //     // test.with_state(Read::External, Write::Memory(&mut storage), || {
+    //     let events = frame_system::Module::<Runtime>::events();
+    //     println!("events {:#?}", events);
+    //     // assert_eq!(events.len(), 2);
+    //     //
+    //     let events = frame_system::Module::<Runtime>::events();
+    //     println!("events {:#?}", events);
+    //     // assert_eq!(events.len(), 1);
+    // });
+    //
+    // // when
+    // test.produce_blocks(5);
+    //
+    // // then
+    // test.with_state(|| {
+    //     let events = frame_system::Module::<Runtime>::events();
+    //     println!("events {:#?}", events);
+    //     // assert_eq!(events.len(), 0);
+    //
+    //     let events = frame_system::Module::<Runtime>::events();
+    //     println!("events {:#?}", events);
+    //     // assert_eq!(events.len(), 0);
+    // });
 }
 
 #[test]

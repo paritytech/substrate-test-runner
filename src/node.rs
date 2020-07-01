@@ -1,6 +1,19 @@
 use std::io::Write;
 use std::sync::Arc;
 use parking_lot::RwLock;
+use sc_service::{ServiceBuilder, Configuration, ServiceComponents, TaskManager, RpcHandlers, TaskType};
+use sp_inherents::InherentDataProviders;
+use sc_cli::{SubstrateCli, build_runtime, CliConfiguration};
+use jsonrpc_core::MetaIoHandler;
+use sc_executor::native_executor_instance;
+
+// Our native executor instance.
+native_executor_instance!(
+	pub Executor,
+	runtime::api::dispatch,
+	runtime::native_version,
+);
+
 
 /// TODO [ToDr] Remove in favour of direct use of `AbstractService`.
 pub(crate) const RPC_WS_URL: &str = "ws://127.0.0.1:9944";
@@ -11,12 +24,15 @@ type ChainSpec = &'static str;
 type Module = String;
 type Logger = Arc<RwLock<std::collections::HashMap<Module, Vec<String>>>>;
 
-#[derive(Debug)]
+/// this holds a reference to a running node on another thread,
+/// we set a port over cli, process is dropped when this struct is dropped
+/// holds logs from the process.
 pub struct InternalNode<T> {
-    node_handle: Option<std::thread::JoinHandle<Result<(), sc_cli::Error>>>,
-    stop_signal: Option<futures::channel::oneshot::Sender<()>>,
-    logs: Logger,
     runtime: T,
+    logs: Logger,
+    tokio_runtime: tokio::runtime::Runtime,
+    rpc_handlers: Arc<MetaIoHandler<sc_rpc::Metadata>>,
+    task_manager: TaskManager,
 }
 
 impl<T> From<T> for InternalNode<T> {
@@ -30,60 +46,48 @@ impl<T> InternalNode<T> {
         InternalNodeBuilder::new(runtime)
     }
 
-    pub fn new(
-        logs: Logger,
-        cli: &[String],    
-        runtime: T,
-        _chain_spec: ChainSpec,
-    ) -> Self {
-        use futures::future::FutureExt;
+    pub fn new(logs: Logger, cli: &[String], runtime: T) -> Self {
         use sc_cli::SubstrateCli;
-        let (tx, rx) = futures::channel::oneshot::channel();
-        let (send_start, start) = std::sync::mpsc::channel();
         let cli = node_cli::Cli::from_iter(cli.iter());
-        // TODO [ToDr] Get a handle of `AbstractService` instead
-        // (crate_configuration + new_light/new_full)
-        // it can be used to send RPC requests directly.
-        let handle = std::thread::spawn(move || {
-            let runner = cli.create_runner(&cli.run)
-                .expect("Unable to create Node runner.");
-            let _ = send_start.send(());
-            runner.run_node_until(
-                node_cli::service::new_light,
-                node_cli::service::new_full,
-                rx.map(|_| ())
-            )
-        });
+        let tokio_runtime = build_runtime().unwrap();
+        let runtime_handle = tokio_runtime.handle().clone();
 
-        // That's so crappy
-        start.recv().unwrap();
-        // std::thread::sleep(std::time::Duration::from_secs(5));
+        let task_executor = move |fut, task_type| {
+            match task_type {
+                TaskType::Async => { runtime_handle.spawn(fut); }
+                TaskType::Blocking => {
+                    runtime_handle.spawn(async move {
+                        // `spawn_blocking` is looking for the current runtime, and as such has to
+                        // be called from within `spawn`.
+                        tokio::task::spawn_blocking(move || futures::executor::block_on(fut))
+                    });
+                }
+            }
+        };
+
+        let config = cli
+            .create_configuration(&cli.run, task_executor.into())
+            // Todo: return result
+            .unwrap();
+        // TODO: result
+        let (task_manager, rpc_handlers) = build_node(config)
+            .unwrap();
 
         Self {
-            node_handle: Some(handle),
-            stop_signal: Some(tx),
             logs,
             runtime,
+            task_manager,
+            tokio_runtime,
+            rpc_handlers: Arc::new(rpc_handlers.into_handler().into()),
         }
+    }
+
+    pub fn rpc_handler(&self) -> Arc<MetaIoHandler<sc_rpc::Metadata>> {
+        self.rpc_handlers.clone()
     }
 
     pub(crate) fn logs(&self) -> &Logger {
         &self.logs
-    }
-}
-
-impl<T> Drop for InternalNode<T> {
-    fn drop(&mut self) {
-        // TODO [ToDr] unwraps!
-        if let Some(signal) = self.stop_signal.take() {
-            if let Err(_) = signal.send(()) {
-				log::error!("couldn't send signal to node to terminate")
-			}
-        }
-        if let Some(handle) = self.node_handle.take() {
-			let result = handle.join();
-			log::error!("node terminated with {:?}", result)
-        }
     }
 }
 
@@ -107,7 +111,7 @@ impl<T> InternalNodeBuilder<T> {
             "yamux", "multistream_select", "libp2p",
             "sc_network", "tokio_reactor", "jsonrpc_client_transports",
             "ws", "sc_network::protocol::generic_proto::behaviour",
-            "sc_service", "sc_peerset", "rpc", "sub-libp2p"
+            "sc_service", "sc_peerset", "rpc", "sub-libp2p", "sync", "peerset"
         ];
         let logs = Logger::default();
         {
@@ -148,7 +152,7 @@ impl<T> InternalNodeBuilder<T> {
 
         Self {
             cli: vec![
-                "--dev".into(),
+                "--chain local".into(),
                 "--no-mdns".into(),
                 "--no-prometheus".into(),
                 "--no-telemetry".into(),
@@ -165,15 +169,78 @@ impl<T> InternalNodeBuilder<T> {
     }
 
     pub fn start(self) -> InternalNode<T> {
-        // TODO [ToDr] Actaully create the chainspec.
-        let chain_spec = "dev";
-
-        InternalNode::new(
-            self.logs,
-            &self.cli,
-            self.runtime,
-            chain_spec,
-        )
+        InternalNode::new(self.logs, &self.cli, self.runtime)
     }
 }
 
+/// TODO: should be generic over the runtime, block and executor.
+/// starts a manual seal authorship task.
+fn build_node(config: Configuration) -> Result<(TaskManager, RpcHandlers), sc_service::Error> {
+    // Channel for the rpc handler to communicate with the authorship task.
+    let (command_sink, commands_stream) = futures::channel::mpsc::channel(1000);
+
+    let ServiceComponents {
+        task_manager, rpc_handlers, client,
+        transaction_pool, select_chain, prometheus_registry,
+        ..
+    } = ServiceBuilder::new_full::<runtime::Block, runtime::RuntimeApi, Executor>(config)?
+        .with_select_chain(|_config, backend| {
+            Ok(sc_consensus::LongestChain::new(backend.clone()))
+        })?
+        .with_transaction_pool(|builder| {
+            let pool_api = sc_transaction_pool::FullChainApi::new(builder.client().clone());
+            Ok(sc_transaction_pool::BasicPool::new(
+                builder.config().transaction_pool.clone(),
+                std::sync::Arc::new(pool_api),
+                builder.prometheus_registry(),
+            ))
+        })?
+        .with_import_queue(|_config, client, _select_chain, _transaction_pool, spawn_task_handle, registry| {
+            Ok(manual_seal::import_queue(
+                Box::new(client),
+                spawn_task_handle,
+                registry,
+            ))
+        })?
+        .with_rpc_extensions(|_| -> Result<jsonrpc_core::IoHandler<sc_rpc::Metadata>, _> {
+            use manual_seal::rpc;
+            let mut io = jsonrpc_core::IoHandler::default();
+            io.extend_with(
+                // We provide the rpc handler with the sending end of the channel to allow the rpc
+                // send EngineCommands to the background block authorship task.
+                rpc::ManualSealApi::to_delegate(rpc::ManualSeal::<runtime::Hash>::new(command_sink)),
+            );
+            Ok(io)
+        })?
+        .build_full()?;
+
+    let inherent_data_providers = InherentDataProviders::new();
+    inherent_data_providers
+        .register_provider(sp_timestamp::InherentDataProvider)
+        .unwrap();
+
+    // Proposer object for block authorship.
+    let proposer = sc_basic_authorship::ProposerFactory::new(
+        client.clone(),
+        transaction_pool.clone(),
+        prometheus_registry.as_ref(),
+    );
+
+    // Background authorship future.
+    let authorship_future = manual_seal::run_manual_seal(
+        Box::new(client.clone()),
+        proposer,
+        client,
+        transaction_pool.pool().clone(),
+        commands_stream,
+        select_chain.expect("SelectChain is set at Service initialization; qed"),
+        inherent_data_providers,
+    );
+
+    // we spawn the future on a background thread managed by service.
+    task_manager.spawn_essential_handle()
+        .spawn("manual-seal", authorship_future);
+
+    // we really only care about the rpc interface.
+    Ok((task_manager, rpc_handlers))
+}

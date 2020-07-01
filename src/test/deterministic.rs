@@ -7,37 +7,46 @@ use tokio::time::{delay_for, Duration};
 use async_trait::async_trait;
 use futures::compat::Future01CompatExt;
 use crate::test::externalities;
+use tokio_compat::runtime::Runtime;
+use futures::FutureExt;
+use jsonrpc_core_client::transports::local;
+use std::thread;
+use manual_seal::rpc::ManualSealClient;
 
 /// A deterministic internal instance of substrate node.
 pub struct Deterministic<TRuntime> {
     node: InternalNode<TRuntime>,
+    compat_runtime: Runtime,
 }
 
-#[async_trait]
-impl<TRuntime: Send> rpc::RpcExtension for Deterministic<TRuntime> {
-    // TODO [ToDr] Override and use the direct channel.
-    async fn rpc<TClient: From<RpcChannel>>(&mut self) -> TClient {
-		rpc::connect_ws(crate::node::RPC_WS_URL)
-            .await
-			.expect("error occured connecting to the node")
+impl<TRuntime: Send + Sync> rpc::RpcExtension for Deterministic<TRuntime> {
+    fn rpc<TClient: From<RpcChannel> + 'static>(&mut self) -> TClient {
+        use futures01::Future;
+        let rpc_handler = self.node.rpc_handler();
+        let (client, fut) = local::connect::<TClient, _, _>(rpc_handler);
+        self.compat_runtime.spawn(fut.map_err(|_| ()));
+
+        client
     }
 }
 
-impl<TRuntime: Send> Deterministic<TRuntime> {
+impl<TRuntime: Send + Sync> Deterministic<TRuntime> {
     pub fn new(node: InternalNode<TRuntime>) -> Self {
-        Self { node }
+        let runtime = Runtime::new().unwrap();
+        Self { node, compat_runtime: runtime }
     }
 
-    pub async fn with_state<R>(&mut self, closure: impl FnOnce() -> R) -> R
+    pub fn with_state<R>(&mut self, closure: impl FnOnce() -> R) -> R
         where
             TRuntime: frame_system::Trait
     {
-        externalities::TestExternalities::<TRuntime>::new(self.rpc().await)
+        let client = self.rpc();
+        externalities::TestExternalities::<TRuntime>::new(client)
             .execute_with(closure)
     }
 }
 
-impl<TRuntime: frame_system::Trait + Send> Deterministic<TRuntime> {
+impl<TRuntime: frame_system::Trait + Send + Sync> Deterministic<TRuntime> {
     pub fn assert_log_line(&self, module: &str, content: &str) {
         if let Some(logs) = self.node.logs().read().get(module) {
             for log in logs {
@@ -51,32 +60,17 @@ impl<TRuntime: frame_system::Trait + Send> Deterministic<TRuntime> {
         }
     }
 
-    /// TODO [ToDr] This method should probably be `produce_blocks(5)` when we switch to
-    /// `ManualConsensus` engine.
-    pub async fn produce_blocks(&mut self, diff: impl Into<crate::types::BlockNumber<TRuntime>>) where
-       // TODO The bound here is a bit shitty, cause in theory the RPC is not frame-specific.
-        crate::types::BlockNumber<TRuntime>: std::convert::TryFrom<primitive_types::U256> + Into<primitive_types::U256>,
-    {
-        // TODO [ToDr] Read from the chain.
-        let current_block_number: crate::types::BlockNumber<TRuntime> = 0.into();
-        let number = current_block_number + diff.into();
-        let client = self.rpc::<crate::rpc::ChainClient<TRuntime>>().await;
-        let mut retry = 100;
-        loop {
-            let header = client.header(None).compat()
-                .await
-                .expect("Unable to get latest header from the node.")
-                .expect("No best header?");
-
-            if header.number > number  {
-                return;
-            }
-
-            retry -= 1;
-            if retry == 0 {
-                panic!("Unable to reach block. Best found: {:?}", header);   
-            }
-            delay_for(Duration::from_secs(1)).await;
-        }
+    pub fn produce_blocks(&mut self, num: usize) {
+        let client = self.rpc::<ManualSealClient<runtime::Block>>();
+        self.compat_runtime.block_on_std(async {
+           for _ in 0..num {
+               println!("produce_blocks");
+               let result = client.create_block(true, true, None)
+                   .compat()
+                   .await
+                   .expect("failed to create blocks");
+               println!("\n\n\n{:#?}\n\n\n\n", result)
+           }
+        });
     }
 }
