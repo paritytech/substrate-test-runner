@@ -175,7 +175,7 @@ impl<T> InternalNodeBuilder<T> {
 
 /// TODO: should be generic over the runtime, block and executor.
 /// starts a manual seal authorship task.
-fn build_node(config: Configuration) -> Result<(TaskManager, RpcHandlers), sc_service::Error> {
+pub fn build_node(config: Configuration) -> Result<(TaskManager, RpcHandlers), sc_service::Error> {
     // Channel for the rpc handler to communicate with the authorship task.
     let (command_sink, commands_stream) = futures::channel::mpsc::channel(1000);
 

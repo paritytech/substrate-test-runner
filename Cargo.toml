@@ -8,6 +8,9 @@ edition = "2018"
 members = [
     "runtime"
 ]
+[[bin]]
+name = "substrate-test-runner"
+path = "src/main.rs"
 
 [dependencies]
 runtime = { package = "test-runtime", path = "./runtime" }
