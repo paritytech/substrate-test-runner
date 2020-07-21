@@ -24,7 +24,9 @@ impl<TRuntime: Send + Sync> rpc::RpcExtension for Deterministic<TRuntime> {
         use futures01::Future;
         let rpc_handler = self.node.rpc_handler();
         let (client, fut) = local::connect::<TClient, _, _>(rpc_handler);
-        self.compat_runtime.spawn(fut.map_err(|_| ()));
+        self.compat_runtime.spawn(fut.map_err(|err| {
+            log::error!("\n\nerror: {:?}\n\n", err)
+        }));
 
         client
     }
@@ -64,7 +66,7 @@ impl<TRuntime: frame_system::Trait + Send + Sync> Deterministic<TRuntime> {
         let client = self.rpc::<ManualSealClient<runtime::Block>>();
         self.compat_runtime.block_on_std(async {
            for _ in 0..num {
-               println!("produce_blocks");
+               println!("\n\nproduce_blocks\n\n");
                let result = client.create_block(true, true, None)
                    .compat()
                    .await

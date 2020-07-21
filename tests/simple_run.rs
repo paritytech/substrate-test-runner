@@ -59,11 +59,9 @@ fn should_read_state() {
     //         nonce,
     //     )
     // });
-    println!("produce_blocks");
-
     // when
     test.produce_blocks(1);
-    println!("produced blocks");
+    println!("\n\nproduced blocks\n\n");
     // test.with_state(|| {
     //     // test.with_state(Read::External, Write::Memory(&mut storage), || {
     //     let events = frame_system::Module::<Runtime>::events();

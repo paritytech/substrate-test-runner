@@ -152,11 +152,11 @@ impl<T> InternalNodeBuilder<T> {
 
         Self {
             cli: vec![
-                "--chain local".into(),
                 "--no-mdns".into(),
                 "--no-prometheus".into(),
                 "--no-telemetry".into(),
-                format!("--base-path={}", random_path)
+                format!("--base-path={}", random_path),
+                "--dev".into(),
             ],
             logs,
             runtime,
@@ -183,7 +183,7 @@ pub fn build_node(config: Configuration) -> Result<(TaskManager, RpcHandlers), s
         task_manager, rpc_handlers, client,
         transaction_pool, select_chain, prometheus_registry,
         ..
-    } = ServiceBuilder::new_full::<runtime::Block, runtime::RuntimeApi, Executor>(config)?
+    } = ServiceBuilder::new_full::<runtime::opaque::Block, runtime::RuntimeApi, Executor>(config)?
         .with_select_chain(|_config, backend| {
             Ok(sc_consensus::LongestChain::new(backend.clone()))
         })?
