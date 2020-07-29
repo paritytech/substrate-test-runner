@@ -4,7 +4,6 @@ use crate::{
     types,
 };
 use jsonrpc_core_client::{RpcChannel, transports::local};
-use async_trait::async_trait;
 use crate::test::externalities::TestExternalities;
 use tokio_compat::runtime::Runtime;
 

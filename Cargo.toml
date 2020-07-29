@@ -37,7 +37,6 @@ futures = { package = "futures", version = "0.3", features = ["compat"] }
 rand = "0.7"
 parking_lot = "0.10"
 tokio = { version = "0.2", features = ["full"] }
-async-trait = "0.1.36"
 
 # Calling RPC
 jsonrpc-core-client = { version = "14.2", features = ["ws"] }

@@ -4,7 +4,6 @@ use jsonrpc_core_client::RpcChannel;
 pub use jsonrpc_core::types::params::Params;
 pub use jsonrpc_core_client::RawClient;
 use jsonrpc_core_client::RpcError;
-use async_trait::async_trait;
 use futures::compat::Future01CompatExt;
 
 pub type ChainClient<T> = sc_rpc_api::chain::ChainClient<

@@ -70,8 +70,7 @@ impl<T> InternalNode<T> {
             // Todo: return result
             .unwrap();
         // TODO: result
-        let (task_manager, rpc_handlers) = build_node(config)
-            .unwrap();
+        let (task_manager, rpc_handlers) = build_node(config).unwrap();
 
         Self {
             logs,
@@ -109,9 +108,9 @@ impl<T> InternalNodeBuilder<T> {
     pub fn new(runtime: T) -> Self {
         let ignore = [
             "yamux", "multistream_select", "libp2p",
-            "sc_network", "tokio_reactor", "jsonrpc_client_transports",
+            "sc_network", "tokio_reactor", "sub-libp2p", "sync", "peerset",
             "ws", "sc_network::protocol::generic_proto::behaviour",
-            "sc_service", "sc_peerset", "rpc", "sub-libp2p", "sync", "peerset"
+            "sc_service", "sc_peerset", "rpc"
         ];
         let logs = Logger::default();
         {

@@ -39,7 +39,15 @@ fn should_run_off_chain_worker() {
 #[test]
 fn should_read_state() {
     // given
-    let mut test = test::deterministic(Runtime.into());
+    let mut test = test::deterministic(
+        test::node(Runtime)
+            // TODO [ToDr] This does not work properly, since we have a shared logger.
+            // .with_sudo(Keyring::Alice)
+            // .with_genesis_state(|| {
+            //     ...
+            // })
+            .start()
+    );
     // test.send_transaction()
     //     .to_module("System")
     //     .call("set_heap_pages")
