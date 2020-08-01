@@ -1,6 +1,10 @@
-use substrate_test_runner::{test, rpc, prelude::*};
+use substrate_test_runner::{test, rpc, prelude::*, subxt};
 use runtime::Runtime;
 use futures::compat::Future01CompatExt;
+use substrate_subxt::{ClientBuilder, DefaultNodeRuntime, PairSigner, balances::TransferCallExt};
+use sp_core::{sr25519, crypto::Pair};
+use sp_runtime::{traits::IdentifyAccount, MultiSigner};
+use pallet_indices::address::Address;
 
 #[test]
 fn should_run_off_chain_worker() {
@@ -39,61 +43,44 @@ fn should_run_off_chain_worker() {
 #[test]
 fn should_read_state() {
     // given
-    let mut test = test::deterministic(
-        test::node(Runtime)
-            // TODO [ToDr] This does not work properly, since we have a shared logger.
-            // .with_sudo(Keyring::Alice)
-            // .with_genesis_state(|| {
-            //     ...
-            // })
-            .start()
-    );
-    // test.send_transaction()
-    //     .to_module("System")
-    //     .call("set_heap_pages")
-    //     .origin(Root)
-    //     .send();
+	let mut test = test::deterministic(Runtime.into());
+	type Balances = pallet_balances::Module<Runtime>;
 
-    // test.with_state(Read::Memory(&map), Write::Sudo, || {
-    //   my_pallet::test_conditions(1)
-    // });
-    //
-    // let balance_call = balances_helper().tranfser(Alice, Bob);
-    // test.read_state(|| {
-    //     <Runtime as CreateTransaction>::create_transaction(
-    //         balance_call,
-    //         signer,
-    //         account,
-    //         nonce,
-    //     )
-    // });
-    // when
     test.produce_blocks(1);
-    println!("\n\nproduced blocks\n\n");
-    // test.with_state(|| {
-    //     // test.with_state(Read::External, Write::Memory(&mut storage), || {
-    //     let events = frame_system::Module::<Runtime>::events();
-    //     println!("events {:#?}", events);
-    //     // assert_eq!(events.len(), 2);
-    //     //
-    //     let events = frame_system::Module::<Runtime>::events();
-    //     println!("events {:#?}", events);
-    //     // assert_eq!(events.len(), 1);
-    // });
-    //
-    // // when
-    // test.produce_blocks(5);
-    //
-    // // then
-    // test.with_state(|| {
-    //     let events = frame_system::Module::<Runtime>::events();
-    //     println!("events {:#?}", events);
-    //     // assert_eq!(events.len(), 0);
-    //
-    //     let events = frame_system::Module::<Runtime>::events();
-    //     println!("events {:#?}", events);
-    //     // assert_eq!(events.len(), 0);
-    // });
+
+	let alice = sr25519::Pair::from_string("//Alice".into(), None).unwrap();
+    let bob = sr25519::Pair::from_string("//Bob".into(), None).unwrap();
+	let signer = PairSigner::new(alice.clone());
+
+	let rpc_handlers = test.rpc_handler();
+	
+	let alice_balance = test.with_state(|| {
+    	Balances::free_balance(MultiSigner::from(alice.public()).into_account())
+    });
+	
+	test.tokio_runtime()
+		.block_on_std(async {
+    		let client = ClientBuilder::<DefaultNodeRuntime>::new()
+    		    .set_client( subxt::SubxtClient::new(rpc_handlers))
+				.build()
+				.await
+				.unwrap();
+
+			client
+				.transfer(&signer, &Address::from(MultiSigner::from(bob.public()).into_account()), 8900000000000000)
+				.await
+				.expect("failed to transfer funds");
+
+		});
+ 
+	test.produce_blocks(1);
+
+    let new_alice_balance = test.with_state(|| {
+    	Balances::free_balance(MultiSigner::from(alice.public()).into_account())
+	});
+	
+	// account for fees
+	assert!((alice_balance - new_alice_balance) > 8900000000000000);
 }
 
 #[test]

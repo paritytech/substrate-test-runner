@@ -1,3 +1,4 @@
+pub mod subxt;
 pub mod node;
 pub mod rpc;
 pub mod test;

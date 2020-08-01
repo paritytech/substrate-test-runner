@@ -4,12 +4,12 @@ use sp_externalities::{Extension, Error};
 use sp_storage::{ChildInfo, StorageKey};
 use futures01::Future;
 
-pub struct TestExternalities<TRuntime: frame_system::Trait> {
-    client: rpc::StateClient<TRuntime>,
+pub struct TestExternalities<Runtime: frame_system::Trait> {
+    client: rpc::StateClient<Runtime>,
 }
 
-impl<TRuntime: frame_system::Trait> TestExternalities<TRuntime> {
-    pub fn new(client: rpc::StateClient<TRuntime>) -> Self {
+impl<Runtime: frame_system::Trait> TestExternalities<Runtime> {
+    pub fn new(client: rpc::StateClient<Runtime>) -> Self {
         Self { client }
     }
 
@@ -19,7 +19,7 @@ impl<TRuntime: frame_system::Trait> TestExternalities<TRuntime> {
 }
 
 // TODO [ToDr] Most likely the implementation is not really relevant, but we still need the trait.
-impl<TRuntime: frame_system::Trait> sp_externalities::ExtensionStore for TestExternalities<TRuntime> {
+impl<Runtime: frame_system::Trait> sp_externalities::ExtensionStore for TestExternalities<Runtime> {
 	fn extension_by_type_id(&mut self, _type_id: TypeId) -> Option<&mut dyn Any> {
         todo!()
     }
@@ -34,7 +34,7 @@ impl<TRuntime: frame_system::Trait> sp_externalities::ExtensionStore for TestExt
 }
 
 
-impl<TRuntime: frame_system::Trait> sp_externalities::Externalities for TestExternalities<TRuntime> {
+impl<Runtime: frame_system::Trait> sp_externalities::Externalities for TestExternalities<Runtime> {
 	fn set_offchain_storage(&mut self, _key: &[u8], _value: Option<&[u8]>) { todo!() }
 
 	fn storage(&self, key: &[u8]) -> Option<Vec<u8>> {
@@ -134,7 +134,7 @@ impl<TRuntime: frame_system::Trait> sp_externalities::Externalities for TestExte
 		todo!()
 	}
 
-	fn set_whitelist(&mut self, new: Vec<Vec<u8>>) {
+	fn set_whitelist(&mut self, _: Vec<Vec<u8>>) {
 		todo!()
 	}
 }

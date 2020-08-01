@@ -15,10 +15,9 @@ use sp_runtime::{
     transaction_validity::{TransactionValidity, TransactionSource},
 };
 use sp_runtime::traits::{
-    BlakeTwo256, Block as BlockT, IdentityLookup, Verify, IdentifyAccount, NumberFor, Saturating,
+    BlakeTwo256, Block as BlockT, IdentityLookup, Verify, IdentifyAccount, Saturating,
 };
 use sp_api::impl_runtime_apis;
-use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_version::RuntimeVersion;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
@@ -182,6 +181,8 @@ impl system::Trait for Runtime {
     type OnKilledAccount = ();
     /// The data to be stored in an account.
     type AccountData = balances::AccountData<Balance>;
+
+    type SystemWeightInfo = ();
 }
 
 
@@ -194,6 +195,8 @@ impl timestamp::Trait for Runtime {
     type Moment = u64;
     type OnTimestampSet = ();
     type MinimumPeriod = MinimumPeriod;
+
+    type WeightInfo = ();
 }
 
 parameter_types! {
@@ -208,6 +211,8 @@ impl balances::Trait for Runtime {
     type DustRemoval = ();
     type ExistentialDeposit = ExistentialDeposit;
     type AccountStore = System;
+
+    type WeightInfo = ();
 }
 
 parameter_types! {

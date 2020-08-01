@@ -3,22 +3,18 @@ use crate::{
     rpc::{self, RpcExtension},
 };
 use jsonrpc_core_client::RpcChannel;
-use tokio::time::{delay_for, Duration};
-use futures::compat::Future01CompatExt;
-use crate::test::externalities;
+use crate::test::externalities::TestExternalities;
 use tokio_compat::runtime::Runtime;
-use futures::FutureExt;
 use jsonrpc_core_client::transports::local;
-use std::thread;
 use manual_seal::rpc::ManualSealClient;
+use std::ops::{Deref, DerefMut};
 
 /// A deterministic internal instance of substrate node.
-pub struct Deterministic<TRuntime> {
-    node: InternalNode<TRuntime>,
-    compat_runtime: Runtime,
+pub struct Deterministic<Block, RuntimeApi, Executor> {
+    node: InternalNode<Block, RuntimeApi, Executor>,
 }
 
-impl<TRuntime: Send + Sync> rpc::RpcExtension for Deterministic<TRuntime> {
+impl<Block, RuntimeApi, Executor> rpc::RpcExtension for Deterministic<Block, RuntimeApi, Executor> {
     fn rpc<TClient: From<RpcChannel> + 'static>(&mut self) -> TClient {
         use futures01::Future;
         let rpc_handler = self.node.rpc_handler();
@@ -29,23 +25,13 @@ impl<TRuntime: Send + Sync> rpc::RpcExtension for Deterministic<TRuntime> {
     }
 }
 
-impl<TRuntime: Send + Sync> Deterministic<TRuntime> {
-    pub fn new(node: InternalNode<TRuntime>) -> Self {
-        let runtime = Runtime::new().unwrap();
-        Self { node, compat_runtime: runtime }
-    }
-
-    pub fn with_state<R>(&mut self, closure: impl FnOnce() -> R) -> R
-        where
-            TRuntime: frame_system::Trait
-    {
-        let client = self.rpc();
-        externalities::TestExternalities::<TRuntime>::new(client)
-            .execute_with(closure)
+impl<Block, RuntimeApi, Executor> Deterministic<Block, RuntimeApi, Executor> {
+    pub fn new(node: InternalNode<Block, RuntimeApi, Executor>) -> Self {
+        Self { node }
     }
 }
 
-impl<TRuntime: frame_system::Trait + Send + Sync> Deterministic<TRuntime> {
+impl<Block, Executor, RuntimeApi: frame_system::Trait + Send + Sync> Deterministic<Block, RuntimeApi, Executor> {
     pub fn assert_log_line(&self, module: &str, content: &str) {
         if let Some(logs) = self.node.logs().read().get(module) {
             for log in logs {
@@ -60,8 +46,38 @@ impl<TRuntime: frame_system::Trait + Send + Sync> Deterministic<TRuntime> {
     }
 
     pub fn produce_blocks(&mut self, num: usize) {
-        let client = self.rpc::<ManualSealClient<runtime::Block>>();
-        let result = self.compat_runtime.block_on(client.create_block(true, true, None));
-        log::info!("{:#?}", result);
+        let client = self.rpc::<ManualSealClient<Runtime::Hash>>();
+        for _ in 0..num {
+			self.node.tokio_runtime()
+				.block_on(client.create_block(true, true, None))
+                .expect("block production failed: ");
+
+		}
+		log::info!("sealed {} blocks", num)
+	}
+	
+
+    pub fn with_state<R>(&mut self, closure: impl FnOnce() -> R) -> R {
+        TestExternalities::<RuntimeApi>::new(self.rpc())
+            .execute_with(closure)
+	}
+	
+}
+
+impl<T> Deref for Deterministic<T> {
+    type Target = InternalNode<T>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.node
     }
 }
+
+impl<T> DerefMut for Deterministic<T> {
+    type Target = InternalNode<T>;
+
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.node
+    }
+}
+
+
