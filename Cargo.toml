@@ -56,3 +56,6 @@ primitive-types = "0.7"
 # Externalities
 sp-externalities = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
 sp-storage = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
+
+[dev-dependencies]
+sp-keyring = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }

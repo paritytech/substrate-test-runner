@@ -4,16 +4,22 @@ use parking_lot::RwLock;
 use sc_service::{
     new_full_parts, spawn_tasks, build_network,
     Configuration, TaskManager, RpcHandlers, TaskType,
-    BuildNetworkParams, SpawnTasksParams, TaskExecutor,
+	BuildNetworkParams, SpawnTasksParams, TaskExecutor,
 };
 use sc_transaction_pool::BasicPool;
 use sp_inherents::InherentDataProviders;
-use sc_cli::SubstrateCli;
+use sc_cli::{SubstrateCli, build_runtime};
 use jsonrpc_core::MetaIoHandler;
 use futures::FutureExt;
-use sc_executor::NativeExecutionDispatch;
-use sp_runtime::traits::Block as BlockT;
 use std::marker::PhantomData;
+use sc_executor::native_executor_instance;
+
+// Our native executor instance.
+native_executor_instance!(
+	pub Executor,
+	runtime::api::dispatch,
+	runtime::native_version,
+);
 
 type Module = String;
 type Logger = Arc<RwLock<std::collections::HashMap<Module, Vec<String>>>>;
@@ -21,36 +27,33 @@ type Logger = Arc<RwLock<std::collections::HashMap<Module, Vec<String>>>>;
 /// this holds a reference to a running node on another thread,
 /// we set a port over cli, process is dropped when this struct is dropped
 /// holds logs from the process.
-pub struct InternalNode<Block, RuntimeApi, Executor> {
+pub struct InternalNode<Runtime> {
 	logs: Logger,
 
 	/// rpc handler for communicating with the node over rpc.
 	rpc_handlers: Arc<MetaIoHandler<sc_rpc::Metadata>>,
 
 	/// tokio-compat runtime
-	_tokio_runtime: tokio_compat::runtime::Runtime,
+	tokio_runtime: tokio_compat::runtime::Runtime,
+
+	_runtime: tokio::runtime::Runtime,
 
 	/// handle to the running node.
 	_task_manager: Option<TaskManager>,
 	
-	/// phantom type to pin generics
-	_phantom: PhantomData<(Block, RuntimeApi, Executor)>
+	_phantom: PhantomData<Runtime>
 }
 
-impl<Block, RuntimeApi, Executor> InternalNode<Block, RuntimeApi, Executor>
-	where
-		Block: BlockT,
-		Executor: NativeExecutionDispatch,
-		RuntimeApi: Send + Sync,
-{
-    pub fn builder() -> InternalNodeBuilder<Block, RuntimeApi, Executor> {
+impl<Runtime> InternalNode<Runtime> {
+    pub fn builder() -> InternalNodeBuilder<Runtime> {
         InternalNodeBuilder::new()
     }
 
 	pub fn new(logs: Logger, cli: &[String]) -> Self {
         let cli = node_cli::Cli::from_iter(cli.iter());
         let tokio_runtime =  tokio_compat::runtime::Runtime::new().unwrap();
-        let runtime_handle = tokio_runtime.handle().clone();
+		let newer_runtime = build_runtime().unwrap();
+		let runtime_handle = newer_runtime.handle().clone();
 
         let task_executor = move |fut, task_type| {
             match task_type {
@@ -66,13 +69,14 @@ impl<Block, RuntimeApi, Executor> InternalNode<Block, RuntimeApi, Executor>
         let config = cli
             .create_configuration(&cli.run, TaskExecutor::from(task_executor))
             .expect("failed to create node config");
-        let (task_manager, rpc_handlers) = build_node::<Block, RuntimeApi, Executor>(config).unwrap();
+        let (task_manager, rpc_handlers) = build_node(config).unwrap();
 
         Self {
             logs,
             _task_manager: Some(task_manager),
-            _tokio_runtime: tokio_runtime,
-			rpc_handlers: Arc::new(rpc_handlers.into_handler().into()),
+			tokio_runtime: tokio_runtime,
+			_runtime: newer_runtime,
+			rpc_handlers: rpc_handlers.io_handler(),
 			_phantom: PhantomData,
         }
     }
@@ -82,7 +86,7 @@ impl<Block, RuntimeApi, Executor> InternalNode<Block, RuntimeApi, Executor>
 	}
 	
 	pub fn tokio_runtime(&mut self) -> &mut tokio_compat::runtime::Runtime {
-		&mut self._tokio_runtime
+		&mut self.tokio_runtime
 	}
 
     pub(crate) fn logs(&self) -> &Logger {
@@ -90,7 +94,7 @@ impl<Block, RuntimeApi, Executor> InternalNode<Block, RuntimeApi, Executor>
     }
 }
 
-impl<Block, RuntimeApi, Executor> Drop for InternalNode<Block, RuntimeApi, Executor> {
+impl<Runtime> Drop for InternalNode<Runtime> {
     fn drop(&mut self) {
         if let Some(mut task_manager) = self._task_manager.take() {
             task_manager.terminate()
@@ -98,14 +102,14 @@ impl<Block, RuntimeApi, Executor> Drop for InternalNode<Block, RuntimeApi, Execu
     }
 }
 #[derive(Debug)]
-pub struct InternalNodeBuilder<Block, RuntimeApi, Executor> {
+pub struct InternalNodeBuilder<Runtime> {
     /// Parameters passed as-is.
     cli: Vec<String>,
 	logs: Logger,
-	_phantom: PhantomData<(Block, RuntimeApi, Executor)>
+	_phantom: PhantomData<Runtime>
 }
 
-impl<Block, RuntimeApi, Executor> InternalNodeBuilder<Block, RuntimeApi, Executor> {
+impl<Runtime> InternalNodeBuilder<Runtime> {
     pub fn new() -> Self {
         let ignore = [
             "yamux", "multistream_select", "libp2p", "jsonrpc_client_transports",
@@ -167,18 +171,13 @@ impl<Block, RuntimeApi, Executor> InternalNodeBuilder<Block, RuntimeApi, Executo
         self
     }
 
-    pub fn start(self) -> InternalNode<Block, RuntimeApi, Executor> {
+    pub fn start(self) -> InternalNode<Runtime> {
         InternalNode::new(self.logs, &self.cli)
     }
 }
 
 /// starts a manual seal authorship task.
-pub fn build_node<Block, RuntimeApi, Executor>(config: Configuration) -> Result<(TaskManager, RpcHandlers), sc_service::Error>
-	where
-		Block: BlockT,
-		Executor: NativeExecutionDispatch,
-		RuntimeApi: frame_system::Trait + Send + Sync,
-{
+pub fn build_node(config: Configuration) -> Result<(TaskManager, RpcHandlers), sc_service::Error> {
     // Channel for the rpc handler to communicate with the authorship task.
     let (command_sink, commands_stream) = futures::channel::mpsc::channel(10);
 
@@ -187,7 +186,7 @@ pub fn build_node<Block, RuntimeApi, Executor>(config: Configuration) -> Result<
         backend,
         keystore,
         mut task_manager
-    ) = new_full_parts::<Block, RuntimeApi, Executor>(&config)?;
+	) = new_full_parts::<runtime::opaque::Block, runtime::RuntimeApi, Executor>(&config)?;
     let client = Arc::new(client);
     let import_queue = manual_seal::import_queue(
         Box::new(client.clone()),
@@ -239,7 +238,7 @@ pub fn build_node<Block, RuntimeApi, Executor>(config: Configuration) -> Result<
                 io.extend_with(
                     // We provide the rpc handler with the sending end of the channel to allow the rpc
                     // send EngineCommands to the background block authorship task.
-                    rpc::ManualSealApi::to_delegate(rpc::ManualSeal::<RuntimeApi::Hash>::new(command_sink.clone())),
+                    rpc::ManualSealApi::to_delegate(rpc::ManualSeal::<runtime::Hash>::new(command_sink.clone())),
                 );
                 io
             }),
@@ -254,7 +253,8 @@ pub fn build_node<Block, RuntimeApi, Executor>(config: Configuration) -> Result<
 	
 	let inherent_data_providers = InherentDataProviders::new();
     inherent_data_providers
-        .register_provider(sp_timestamp::InherentDataProvider)?;
+		.register_provider(sp_timestamp::InherentDataProvider)
+		.expect("failed to register timestamp inherent");
 	
 	let select_chain = sc_consensus::LongestChain::new(backend.clone());
 

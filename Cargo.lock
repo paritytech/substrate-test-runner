@@ -7800,6 +7800,7 @@ dependencies = [
  "sp-core 2.0.0-rc5 (git+https://github.com/paritytech/substrate.git?branch=seun-substrate-test-runner)",
  "sp-externalities 0.8.0-rc5 (git+https://github.com/paritytech/substrate.git?branch=seun-substrate-test-runner)",
  "sp-inherents 2.0.0-rc5 (git+https://github.com/paritytech/substrate.git?branch=seun-substrate-test-runner)",
+ "sp-keyring",
  "sp-runtime 2.0.0-rc5 (git+https://github.com/paritytech/substrate.git?branch=seun-substrate-test-runner)",
  "sp-storage 2.0.0-rc5 (git+https://github.com/paritytech/substrate.git?branch=seun-substrate-test-runner)",
  "sp-timestamp",
@@ -8493,9 +8494,9 @@ checksum = "373c8a200f9e67a0c95e62a4f52fbf80c23b4381c05a17845531982fa99e6b33"
 
 [[package]]
 name = "uint"
-version = "0.8.3"
+version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "173cd16430c206dc1a430af8a89a0e9c076cf15cb42b4aedb10e8cc8fee73681"
+checksum = "429ffcad8c8c15f874578c7337d156a3727eb4a1c2374c0ae937ad9a9b748c80"
 dependencies = [
  "byteorder",
  "crunchy",

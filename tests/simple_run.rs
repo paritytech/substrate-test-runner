@@ -2,14 +2,15 @@ use substrate_test_runner::{test, rpc, prelude::*, subxt};
 use runtime::Runtime;
 use futures::compat::Future01CompatExt;
 use substrate_subxt::{ClientBuilder, DefaultNodeRuntime, PairSigner, balances::TransferCallExt};
-use sp_core::{sr25519, crypto::Pair};
+use sp_core::crypto::Pair;
 use sp_runtime::{traits::IdentifyAccount, MultiSigner};
 use pallet_indices::address::Address;
+use sp_keyring::Sr25519Keyring;
 
 #[test]
 fn should_run_off_chain_worker() {
     let mut test = test::deterministic(
-        test::node(Runtime)
+        test::node::<Runtime>()
             // TODO [ToDr] This does not work properly, since we have a shared logger.
             .cli_param("-lsc_offchain=trace") 
             // .with_sudo(Keyring::Alice)
@@ -43,13 +44,13 @@ fn should_run_off_chain_worker() {
 #[test]
 fn should_read_state() {
     // given
-	let mut test = test::deterministic(Runtime.into());
+	let mut test = test::deterministic(test::node::<Runtime>().start());
 	type Balances = pallet_balances::Module<Runtime>;
 
     test.produce_blocks(1);
 
-	let alice = sr25519::Pair::from_string("//Alice".into(), None).unwrap();
-    let bob = sr25519::Pair::from_string("//Bob".into(), None).unwrap();
+	let alice = Sr25519Keyring::Alice.pair();
+    let bob = Sr25519Keyring::Bob.pair();
 	let signer = PairSigner::new(alice.clone());
 
 	let rpc_handlers = test.rpc_handler();
@@ -85,7 +86,7 @@ fn should_read_state() {
 
 #[test]
 fn external_black_box() {
-    let test = test::blackbox_external("ws://127.0.0.1:3001", Runtime);
+    let test = test::blackbox_external::<Runtime>("ws://127.0.0.1:3001");
     test.wait_blocks(5_u32);
 }
 

@@ -25,8 +25,7 @@ pub trait RpcExtension {
     fn rpc<TClient: From<RpcChannel> + 'static>(&mut self) -> TClient;
 }
 
-pub async fn connect_ws<TClient: From<RpcChannel>>(url: &str) -> Result<TClient, RpcError>
-{
+pub async fn connect_ws<TClient: From<RpcChannel>>(url: &str) -> Result<TClient, RpcError> {
     let url = url::Url::parse(url).expect("URL is valid");
     jsonrpc_core_client::transports::ws::connect(&url)
         .compat()
