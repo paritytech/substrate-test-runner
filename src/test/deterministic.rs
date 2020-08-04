@@ -1,70 +1,79 @@
+use crate::test::externalities::TestExternalities;
 use crate::{
-    node::InternalNode,
-    rpc::{self, RpcExtension},
+	node::InternalNode,
+	rpc::{self, RpcExtension},
 };
+use jsonrpc_core_client::transports::local;
 use jsonrpc_core_client::RpcChannel;
+use manual_seal::rpc::ManualSealClient;
+use std::ops::{Deref, DerefMut};
 
 /// A deterministic internal instance of substrate node.
-pub struct Deterministic<TRuntime> {
-    node: InternalNode<TRuntime>,
+pub struct Deterministic<Runtime> {
+	node: InternalNode<Runtime>,
 }
 
-impl<TRuntime> rpc::RpcExtension for Deterministic<TRuntime> {
-    // TODO [ToDr] Override and use the direct channel.
-    fn rpc<TClient: From<RpcChannel> + Send + 'static>(&mut self) -> TClient {
-        rpc::connect_ws(crate::node::RPC_WS_URL)
-    }
+impl<Runtime> rpc::RpcExtension for Deterministic<Runtime> {
+	fn rpc<TClient: From<RpcChannel> + 'static>(&mut self) -> TClient {
+		use futures01::Future;
+		let rpc_handler = self.node.rpc_handler();
+		let (client, fut) = local::connect::<TClient, _, _>(rpc_handler);
+		self.node.tokio_runtime().spawn(fut.map_err(|_| ()));
+
+		client
+	}
 }
 
-impl<TRuntime> crate::test::SubstrateTest<TRuntime> for Deterministic<TRuntime> {}
-
-impl<TRuntime> Deterministic<TRuntime> {
-    pub fn new(node: InternalNode<TRuntime>) -> Self {
-        Self { node }
-    }   
+impl<Runtime> Deterministic<Runtime> {
+	pub fn new(node: InternalNode<Runtime>) -> Self {
+		Self { node }
+	}
 }
 
-impl<TRuntime: frame_system::Trait> Deterministic<TRuntime> {
-    pub fn assert_log_line(&self, module: &str, content: &str) {
-        if let Some(logs) = self.node.logs().read().get(module) {
-            for log in logs {
-                if log.contains(content) {
-                    return;
-                }
-            }
-            panic!("Could not find {} in logs: {:?}", content, logs)
-        } else {
-            panic!("No logs from {} module.", module);
-        }
-    }
+impl<Runtime: frame_system::Trait + Send + Sync> Deterministic<Runtime> {
+	pub fn assert_log_line(&self, module: &str, content: &str) {
+		if let Some(logs) = self.node.logs().read().get(module) {
+			for log in logs {
+				if log.contains(content) {
+					return;
+				}
+			}
+			panic!("Could not find {} in logs: {:?}", content, logs)
+		} else {
+			panic!("No logs from {} module.", module);
+		}
+	}
 
-    /// TODO [ToDr] This method should probably be `produce_blocks(5)` when we switch to
-    /// `ManualConsensus` engine.
-    pub fn produce_blocks(&mut self, diff: impl Into<crate::types::BlockNumber<TRuntime>>) where
-       // TODO The bound here is a bit shitty, cause in theory the RPC is not frame-specific.
-        crate::types::BlockNumber<TRuntime>: std::convert::TryFrom<primitive_types::U256> + Into<primitive_types::U256>,
-    {
-        // TODO [ToDr] Read from the chain.
-        let current_block_number: crate::types::BlockNumber<TRuntime> = 0.into();
-        use jsonrpc_core::futures::Future;
+	pub fn produce_blocks(&mut self, num: usize) {
+		log::info!("produce blocks");
 
-        let number = current_block_number + diff.into();
-        let client = self.rpc::<crate::rpc::ChainClient<TRuntime>>();
-        let mut retry = 100;
-        loop {
-            let header = client.header(None).wait()
-                .expect("Unable to get latest header from the node.")
-                .expect("No best header?");
+		let client = self.rpc::<ManualSealClient<Runtime::Hash>>();
+		log::info!("produce blocks");
 
-            if header.number > number  {
-                return;
-            }
+		for _ in 0..num {
+			self.node
+				.tokio_runtime()
+				.block_on(client.create_block(true, true, None))
+				.expect("block production failed: ");
+		}
+		log::info!("sealed {} blocks", num)
+	}
 
-            retry -= 1;
-            if retry == 0 {
-                panic!("Unable to reach block. Best found: {:?}", header);   
-            }
-            std::thread::sleep(std::time::Duration::from_secs(1));
-        }
-    }
+	pub fn with_state<R>(&mut self, closure: impl FnOnce() -> R) -> R {
+		TestExternalities::<Runtime>::new(self.rpc()).execute_with(closure)
+	}
+}
+
+impl<T> Deref for Deterministic<T> {
+	type Target = InternalNode<T>;
+
+	fn deref(&self) -> &Self::Target {
+		&self.node
+	}
+}
+
+impl<T> DerefMut for Deterministic<T> {
+	fn deref_mut(&mut self) -> &mut Self::Target {
+		&mut self.node
+	}
 }

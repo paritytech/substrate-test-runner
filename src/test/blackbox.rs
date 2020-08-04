@@ -1,42 +1,57 @@
+use crate::test::externalities::TestExternalities;
 use crate::{
-    node::InternalNode,
-    rpc,
-    types,
+	node::InternalNode,
+	rpc::{self, RpcExtension},
+	types,
 };
-use jsonrpc_core_client::RpcChannel;
+use jsonrpc_core_client::{transports::local, RpcChannel};
 
-pub enum BlackBoxNode<TRuntime> {
-    /// Connects to an external node.
-    External(String),
-    /// Spawns a pristine node.
-    Internal(InternalNode<TRuntime>),
+pub enum BlackBoxNode<Runtime> {
+	/// Connects to an external node.
+	External(String),
+	/// Spawns a pristine node.
+	Internal(InternalNode<Runtime>),
 }
 
 /// A black box test.
-pub struct BlackBox<TRuntime> {
-    node: BlackBoxNode<TRuntime>,
+pub struct BlackBox<Runtime> {
+	node: BlackBoxNode<Runtime>,
 }
 
-impl<TRuntime> rpc::RpcExtension for BlackBox<TRuntime> {
-    fn rpc<TClient: From<RpcChannel> + Send + 'static>(&mut self) -> TClient {
-        match self.node {
-            BlackBoxNode::External(ref url) => rpc::connect_ws(&url),
-            BlackBoxNode::Internal(_) => rpc::connect_ws(crate::node::RPC_WS_URL),
-        }
-    }
+impl<Runtime> BlackBox<Runtime>
+where
+	Runtime: frame_system::Trait,
+{
+	pub async fn with_state<R>(&mut self, closure: impl FnOnce() -> R) -> R {
+		TestExternalities::<Runtime>::new(self.rpc()).execute_with(closure)
+	}
 }
 
-impl<TRuntime> crate::test::SubstrateTest<TRuntime> for BlackBox<TRuntime> {}
+impl<Runtime> rpc::RpcExtension for BlackBox<Runtime> {
+	fn rpc<TClient: From<RpcChannel> + 'static>(&mut self) -> TClient {
+		let client = match self.node {
+			BlackBoxNode::External(ref url) => futures::executor::block_on(rpc::connect_ws(&url)).unwrap(),
+			BlackBoxNode::Internal(ref mut node) => {
+				use futures01::Future;
+				let (client, fut) = local::connect::<TClient, _, _>(node.rpc_handler());
+				node.tokio_runtime().spawn(fut.map_err(|_| ()));
 
-impl<TRuntime> BlackBox<TRuntime> {
-    pub fn new(node: BlackBoxNode<TRuntime>) -> Self {
-        Self { node }
-    }
+				client
+			}
+		};
+		client
+	}
 }
 
-impl<TRuntime: frame_system::Trait> BlackBox<TRuntime> {
-    /// Wait `number` of blocks.
-    pub fn wait_blocks(&self, _number: impl Into<types::BlockNumber<TRuntime>>) {
-        todo!()
-    }
+impl<Runtime> BlackBox<Runtime> {
+	pub fn new(node: BlackBoxNode<Runtime>) -> Self {
+		Self { node }
+	}
+}
+
+impl<Runtime: frame_system::Trait> BlackBox<Runtime> {
+	/// Wait `number` of blocks.
+	pub fn wait_blocks(&self, _number: impl Into<types::BlockNumber<Runtime>>) {
+		todo!()
+	}
 }

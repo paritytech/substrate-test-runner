@@ -1,100 +1,97 @@
-use substrate_test_runner::{test, rpc, prelude::*};
-use jsonrpc_core::futures::Future;
-use node_runtime::Runtime;
-
+use futures::compat::Future01CompatExt;
+use pallet_indices::address::Address;
+use runtime::Runtime;
+use sp_core::crypto::Pair;
+use sp_keyring::Sr25519Keyring;
+use sp_runtime::{traits::IdentifyAccount, MultiSigner};
+use substrate_subxt::{balances::TransferCallExt, ClientBuilder, DefaultNodeRuntime, PairSigner};
+use substrate_test_runner::{prelude::*, rpc, subxt, test};
 
 #[test]
 fn should_run_off_chain_worker() {
-    let mut test = test::deterministic(
-        test::node(Runtime)
-            // TODO [ToDr] This does not work properly, since we have a shared logger.
-            .cli_param("-lsc_offchain=trace") 
-            // .with_sudo(Keyring::Alice)
-            // .with_genesis_state(|| {
-            //     ...
-            // })
-            .start()
-    );
+	let mut test = test::deterministic(
+		test::node::<Runtime>()
+			// TODO [ToDr] This does not work properly, since we have a shared logger.
+			.cli_param("-lsc_offchain=trace")
+			// .with_sudo(Keyring::Alice)
+			// .with_genesis_state(|| {
+			//     ...
+			// })
+			.start(),
+	);
+	let chain_client = test.rpc::<rpc::ChainClient<Runtime>>();
+	let rpc_client = test.raw_rpc();
+	test.tokio_runtime().block_on_std(async {
 
-    let chain_client = test.rpc::<rpc::ChainClient<Runtime>>();
-    let rpc_client = test.raw_rpc();
+		// TODO [ToDr] This should be even rawer - allowing to pass JSON call,
+		// which in turn could be collected from the UI.
+		let header = rpc_client
+			.call_method("chain_getHeader", rpc::Params::Array(vec![]))
+			.compat()
+			.await;
+		println!("{:?}", header);
 
-    // TODO [ToDr] This should be even rawer - allowing to pass JSON call,
-    // which in turn could be collected from the UI.
-    let header = rpc_client.call_method(
-        "chain_getHeader",
-        rpc::Params::Array(vec![]),
-    ).wait();
-    println!("{:?}", header);
+		let header = chain_client.header(None).compat().await.unwrap();
+		println!("{:?}", header);
 
-    let header = chain_client.header(None).wait().unwrap();
-    println!("{:?}", header);
+	});
 
-    test.produce_blocks(15_u32);
-
-    test.assert_log_line("db", "best = true");
+	test.produce_blocks(15);
+	test.assert_log_line("db", "best = true");
 }
 
 #[test]
 fn should_read_state() {
-    // given
-    let mut test = test::deterministic(Runtime.into());
-    // test.send_transaction()
-    //     .to_module("System")
-    //     .call("set_heap_pages")
-    //     .origin(Root)
-    //     .send();
+	// given
+	let mut test = test::deterministic(test::node::<Runtime>().start());
+	type Balances = pallet_balances::Module<Runtime>;
 
-    // test.with_state(Read::Memory(&map), Write::Sudo, || {
-    //   my_pallet::test_conditions(1)
-    // });
-    //
-    // let balance_call = balances_helper().tranfser(Alice, Bob);
-    // test.read_state(|| {
-    //     <Runtime as CreateTransaction>::create_transaction(
-    //         balance_call,
-    //         signer,
-    //         account,
-    //         nonce,
-    //     )
-    // });
+	test.produce_blocks(1);
 
-    // when
-    test.produce_blocks(5_u32);
-    test.with_state(|| {
-    // test.with_state(Read::External, Write::Memory(&mut storage), || {
-        let events = frame_system::Module::<Runtime>::events();
-        assert_eq!(events.len(), 1);
+	let alice = Sr25519Keyring::Alice.pair();
+	let bob = Sr25519Keyring::Bob.pair();
+	let signer = PairSigner::new(alice.clone());
 
-        let events = frame_system::Module::<Runtime>::events();
-        assert_eq!(events.len(), 1);
-    });
+	let rpc_handlers = test.rpc_handler();
 
-    // when
-    test.produce_blocks(5_u32);
+	let alice_balance = test.with_state(|| Balances::free_balance(MultiSigner::from(alice.public()).into_account()));
 
-    // then
-    test.with_state(|| {
-    // test.with_state(Read::External, Write::Memory(&mut storage), || {
-        let events = frame_system::Module::<Runtime>::events();
-        assert_eq!(events.len(), 0);
+	test.tokio_runtime().block_on_std(async {
+		let client = ClientBuilder::<DefaultNodeRuntime>::new()
+			.set_client(subxt::SubxtClient::new(rpc_handlers))
+			.build()
+			.await
+			.unwrap();
 
-        let events = frame_system::Module::<Runtime>::events();
-        assert_eq!(events.len(), 0);
-    });
+		client
+			.transfer(
+				&signer,
+				&Address::from(MultiSigner::from(bob.public()).into_account()),
+				8900000000000000,
+			)
+			.await
+			.expect("failed to transfer funds");
+	});
+
+	test.produce_blocks(1);
+
+	let new_alice_balance =
+		test.with_state(|| Balances::free_balance(MultiSigner::from(alice.public()).into_account()));
+
+	// account for fees
+	assert!((alice_balance - new_alice_balance) > 8900000000000000);
 }
 
 #[test]
+#[ignore] // wait_blocks not implemented yet.
 fn external_black_box() {
-    let test = test::blackbox_external("ws://127.0.0.1:3001", Runtime);
-    test.wait_blocks(5_u32);
+	let test = test::blackbox_external::<Runtime>("ws://127.0.0.1:3001");
+	test.wait_blocks(5_u32);
 }
-
 
 // Check state using decl_storage
 // Assert a log line
 // Initially start with a "runtime example"
-// Customize the runtime somehow 
+// Customize the runtime somehow
 //  $ cp node/runtime /tmp/temp_runtime
 //  $ sed -../
-
