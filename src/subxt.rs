@@ -1,3 +1,4 @@
+use futures::compat::Future01CompatExt;
 use futures::{
 	channel::mpsc,
 	compat::{Compat01As03, Sink01CompatExt, Stream01CompatExt},
@@ -5,29 +6,25 @@ use futures::{
 	stream::StreamExt,
 };
 use futures01::sync::mpsc as mpsc01;
+use jsonrpc_core::MetaIoHandler;
 use jsonrpsee::{
 	common::{Request, Response},
 	transport::TransportClient,
 };
 pub use sc_service::{
-	config::{
-		DatabaseConfig,
-		KeystoreConfig,
-	},
+	config::{DatabaseConfig, KeystoreConfig},
 	Error as ServiceError,
 };
 use std::{future::Future, pin::Pin, sync::Arc};
-use jsonrpc_core::MetaIoHandler;
-use futures::compat::Future01CompatExt;
 
 /// Error thrown by the client.
 #[derive(Debug, derive_more::Display, derive_more::From, derive_more::Error)]
 pub enum SubxtClientError {
 	/// Failed to parse json rpc message.
-	#[display(fmt="{}", _0)]
+	#[display(fmt = "{}", _0)]
 	Json(serde_json::Error),
 	/// Channel closed.
-	#[display(fmt="{}", _0)]
+	#[display(fmt = "{}", _0)]
 	Mpsc(mpsc::SendError),
 }
 
@@ -78,9 +75,7 @@ impl TransportClient for SubxtClient {
 		})
 	}
 
-	fn next_response<'a>(
-		&'a mut self,
-	) -> Pin<Box<dyn Future<Output = Result<Response, Self::Error>> + Send + 'a>> {
+	fn next_response<'a>(&'a mut self) -> Pin<Box<dyn Future<Output = Result<Response, Self::Error>> + Send + 'a>> {
 		Box::pin(async move {
 			let response = self
 				.response_stream

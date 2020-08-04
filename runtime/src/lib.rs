@@ -2,41 +2,40 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 // `construct_runtime!` does a lot of recursion and requires us to increase the limit to 256.
-#![recursion_limit="256"]
+#![recursion_limit = "256"]
 
 // Make the WASM binary available.
 #[cfg(feature = "std")]
 include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 
-use sp_std::prelude::*;
-use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
-use sp_runtime::{
-    ApplyExtrinsicResult, generic, create_runtime_str, impl_opaque_keys, MultiSignature,
-    transaction_validity::{TransactionValidity, TransactionSource},
-};
-use sp_runtime::traits::{
-    BlakeTwo256, Block as BlockT, IdentityLookup, Verify, IdentifyAccount, Saturating,
-};
 use sp_api::impl_runtime_apis;
-use sp_version::RuntimeVersion;
+use sp_core::{crypto::KeyTypeId, OpaqueMetadata};
+use sp_runtime::traits::{BlakeTwo256, Block as BlockT, IdentifyAccount, IdentityLookup, Saturating, Verify};
+use sp_runtime::{
+	create_runtime_str, generic, impl_opaque_keys,
+	transaction_validity::{TransactionSource, TransactionValidity},
+	ApplyExtrinsicResult, MultiSignature,
+};
+use sp_std::prelude::*;
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
+use sp_version::RuntimeVersion;
 
 // A few exports that help ease life for downstream crates.
+pub use balances::Call as BalancesCall;
+pub use frame_support::{
+	construct_runtime, parameter_types,
+	traits::{KeyOwnerProofSystem, Randomness},
+	weights::{
+		constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
+		IdentityFee, Weight,
+	},
+	StorageValue,
+};
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
+pub use sp_runtime::{Perbill, Permill};
 pub use timestamp::Call as TimestampCall;
-pub use balances::Call as BalancesCall;
-pub use sp_runtime::{Permill, Perbill};
-pub use frame_support::{
-    construct_runtime, parameter_types, StorageValue,
-    traits::{KeyOwnerProofSystem, Randomness},
-    weights::{
-        Weight, IdentityFee,
-        constants::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight, WEIGHT_PER_SECOND},
-    },
-};
-
 
 /// An index to a block.
 pub type BlockNumber = u32;
@@ -69,31 +68,31 @@ pub type DigestItem = generic::DigestItem<Hash>;
 /// of data like extrinsics, allowing for them to continue syncing the network through upgrades
 /// to even the core data structures.
 pub mod opaque {
-    use super::*;
+	use super::*;
 
-    pub use sp_runtime::OpaqueExtrinsic as UncheckedExtrinsic;
+	pub use sp_runtime::OpaqueExtrinsic as UncheckedExtrinsic;
 
-    /// Opaque block header type.
-    pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
-    /// Opaque block type.
-    pub type Block = generic::Block<Header, UncheckedExtrinsic>;
-    /// Opaque block identifier type.
-    pub type BlockId = generic::BlockId<Block>;
+	/// Opaque block header type.
+	pub type Header = generic::Header<BlockNumber, BlakeTwo256>;
+	/// Opaque block type.
+	pub type Block = generic::Block<Header, UncheckedExtrinsic>;
+	/// Opaque block identifier type.
+	pub type BlockId = generic::BlockId<Block>;
 
-    impl_opaque_keys! {
+	impl_opaque_keys! {
 		pub struct SessionKeys {}
 	}
 }
 
 /// This runtime version.
 pub const VERSION: RuntimeVersion = RuntimeVersion {
-    spec_name: create_runtime_str!("node-template"),
-    impl_name: create_runtime_str!("node-template"),
-    authoring_version: 1,
-    spec_version: 1,
-    impl_version: 1,
-    apis: RUNTIME_API_VERSIONS,
-    transaction_version: 1,
+	spec_name: create_runtime_str!("node-template"),
+	impl_name: create_runtime_str!("node-template"),
+	authoring_version: 1,
+	spec_version: 1,
+	impl_version: 1,
+	apis: RUNTIME_API_VERSIONS,
+	transaction_version: 1,
 };
 
 pub const MILLISECS_PER_BLOCK: u64 = 6000;
@@ -108,10 +107,10 @@ pub const DAYS: BlockNumber = HOURS * 24;
 /// The version information used to identify this runtime when compiled natively.
 #[cfg(feature = "std")]
 pub fn native_version() -> NativeVersion {
-    NativeVersion {
-        runtime_version: VERSION,
-        can_author_with: Default::default(),
-    }
+	NativeVersion {
+		runtime_version: VERSION,
+		can_author_with: Default::default(),
+	}
 }
 
 parameter_types! {
@@ -127,76 +126,75 @@ parameter_types! {
 }
 
 impl system::Trait for Runtime {
-    /// The basic call filter to use in dispatchable.
-    type BaseCallFilter = ();
-    /// The identifier used to distinguish between accounts.
-    type AccountId = AccountId;
-    /// The aggregated dispatch type that is available for extrinsics.
-    type Call = Call;
-    /// The lookup mechanism to get account ID from whatever is passed in dispatchers.
-    type Lookup = IdentityLookup<AccountId>;
-    /// The index type for storing how many extrinsics an account has signed.
-    type Index = Index;
-    /// The index type for blocks.
-    type BlockNumber = BlockNumber;
-    /// The type for hashing blocks and tries.
-    type Hash = Hash;
-    /// The hashing algorithm used.
-    type Hashing = BlakeTwo256;
-    /// The header type.
-    type Header = generic::Header<BlockNumber, BlakeTwo256>;
-    /// The ubiquitous event type.
-    type Event = Event;
-    /// The ubiquitous origin type.
-    type Origin = Origin;
-    /// Maximum number of block number to block hash mappings to keep (oldest pruned first).
-    type BlockHashCount = BlockHashCount;
-    /// Maximum weight of each block.
-    type MaximumBlockWeight = MaximumBlockWeight;
-    /// The weight of database operations that the runtime can invoke.
-    type DbWeight = RocksDbWeight;
-    /// The weight of the overhead invoked on the block import process, independent of the
+	/// The basic call filter to use in dispatchable.
+	type BaseCallFilter = ();
+	/// The identifier used to distinguish between accounts.
+	type AccountId = AccountId;
+	/// The aggregated dispatch type that is available for extrinsics.
+	type Call = Call;
+	/// The lookup mechanism to get account ID from whatever is passed in dispatchers.
+	type Lookup = IdentityLookup<AccountId>;
+	/// The index type for storing how many extrinsics an account has signed.
+	type Index = Index;
+	/// The index type for blocks.
+	type BlockNumber = BlockNumber;
+	/// The type for hashing blocks and tries.
+	type Hash = Hash;
+	/// The hashing algorithm used.
+	type Hashing = BlakeTwo256;
+	/// The header type.
+	type Header = generic::Header<BlockNumber, BlakeTwo256>;
+	/// The ubiquitous event type.
+	type Event = Event;
+	/// The ubiquitous origin type.
+	type Origin = Origin;
+	/// Maximum number of block number to block hash mappings to keep (oldest pruned first).
+	type BlockHashCount = BlockHashCount;
+	/// Maximum weight of each block.
+	type MaximumBlockWeight = MaximumBlockWeight;
+	/// The weight of database operations that the runtime can invoke.
+	type DbWeight = RocksDbWeight;
+	/// The weight of the overhead invoked on the block import process, independent of the
 	/// extrinsics included in that block.
-    type BlockExecutionWeight = BlockExecutionWeight;
-    /// The base weight of any extrinsic processed by the runtime, independent of the
+	type BlockExecutionWeight = BlockExecutionWeight;
+	/// The base weight of any extrinsic processed by the runtime, independent of the
 	/// logic of that extrinsic. (Signature verification, nonce increment, fee, etc...)
-    type ExtrinsicBaseWeight = ExtrinsicBaseWeight;
-    /// The maximum weight that a single extrinsic of `Normal` dispatch class can have,
+	type ExtrinsicBaseWeight = ExtrinsicBaseWeight;
+	/// The maximum weight that a single extrinsic of `Normal` dispatch class can have,
 	/// idependent of the logic of that extrinsics. (Roughly max block weight - average on
 	/// initialize cost).
-    type MaximumExtrinsicWeight = MaximumExtrinsicWeight;
-    /// Maximum size of all encoded transactions (in bytes) that are allowed in one block.
-    type MaximumBlockLength = MaximumBlockLength;
-    /// Portion of the block weight that is available to all normal transactions.
-    type AvailableBlockRatio = AvailableBlockRatio;
-    /// Version of the runtime.
-    type Version = Version;
-    /// Converts a module to the index of the module in `construct_runtime!`.
+	type MaximumExtrinsicWeight = MaximumExtrinsicWeight;
+	/// Maximum size of all encoded transactions (in bytes) that are allowed in one block.
+	type MaximumBlockLength = MaximumBlockLength;
+	/// Portion of the block weight that is available to all normal transactions.
+	type AvailableBlockRatio = AvailableBlockRatio;
+	/// Version of the runtime.
+	type Version = Version;
+	/// Converts a module to the index of the module in `construct_runtime!`.
 	///
 	/// This type is being generated by `construct_runtime!`.
-    type ModuleToIndex = ModuleToIndex;
-    /// What to do if a new account is created.
-    type OnNewAccount = ();
-    /// What to do if an account is fully reaped from the system.
-    type OnKilledAccount = ();
-    /// The data to be stored in an account.
-    type AccountData = balances::AccountData<Balance>;
+	type ModuleToIndex = ModuleToIndex;
+	/// What to do if a new account is created.
+	type OnNewAccount = ();
+	/// What to do if an account is fully reaped from the system.
+	type OnKilledAccount = ();
+	/// The data to be stored in an account.
+	type AccountData = balances::AccountData<Balance>;
 
-    type SystemWeightInfo = ();
+	type SystemWeightInfo = ();
 }
-
 
 parameter_types! {
 	pub const MinimumPeriod: u64 = SLOT_DURATION / 2;
 }
 
 impl timestamp::Trait for Runtime {
-    /// A timestamp: milliseconds since the unix epoch.
-    type Moment = u64;
-    type OnTimestampSet = ();
-    type MinimumPeriod = MinimumPeriod;
+	/// A timestamp: milliseconds since the unix epoch.
+	type Moment = u64;
+	type OnTimestampSet = ();
+	type MinimumPeriod = MinimumPeriod;
 
-    type WeightInfo = ();
+	type WeightInfo = ();
 }
 
 parameter_types! {
@@ -204,15 +202,15 @@ parameter_types! {
 }
 
 impl balances::Trait for Runtime {
-    /// The type for recording an account's balance.
-    type Balance = Balance;
-    /// The ubiquitous event type.
-    type Event = Event;
-    type DustRemoval = ();
-    type ExistentialDeposit = ExistentialDeposit;
-    type AccountStore = System;
+	/// The type for recording an account's balance.
+	type Balance = Balance;
+	/// The ubiquitous event type.
+	type Event = Event;
+	type DustRemoval = ();
+	type ExistentialDeposit = ExistentialDeposit;
+	type AccountStore = System;
 
-    type WeightInfo = ();
+	type WeightInfo = ();
 }
 
 parameter_types! {
@@ -220,16 +218,16 @@ parameter_types! {
 }
 
 impl transaction_payment::Trait for Runtime {
-    type Currency = balances::Module<Runtime>;
-    type OnTransactionPayment = ();
-    type TransactionByteFee = TransactionByteFee;
-    type WeightToFee = IdentityFee<Balance>;
-    type FeeMultiplierUpdate = ();
+	type Currency = balances::Module<Runtime>;
+	type OnTransactionPayment = ();
+	type TransactionByteFee = TransactionByteFee;
+	type WeightToFee = IdentityFee<Balance>;
+	type FeeMultiplierUpdate = ();
 }
 
 impl sudo::Trait for Runtime {
-    type Event = Event;
-    type Call = Call;
+	type Event = Event;
+	type Call = Call;
 }
 
 construct_runtime!(
@@ -259,13 +257,13 @@ pub type SignedBlock = generic::SignedBlock<Block>;
 pub type BlockId = generic::BlockId<Block>;
 /// The SignedExtension to the basic transaction logic.
 pub type SignedExtra = (
-    system::CheckSpecVersion<Runtime>,
-    system::CheckTxVersion<Runtime>,
-    system::CheckGenesis<Runtime>,
-    system::CheckEra<Runtime>,
-    system::CheckNonce<Runtime>,
-    system::CheckWeight<Runtime>,
-    transaction_payment::ChargeTransactionPayment<Runtime>
+	system::CheckSpecVersion<Runtime>,
+	system::CheckTxVersion<Runtime>,
+	system::CheckGenesis<Runtime>,
+	system::CheckEra<Runtime>,
+	system::CheckNonce<Runtime>,
+	system::CheckWeight<Runtime>,
+	transaction_payment::ChargeTransactionPayment<Runtime>,
 );
 /// Unchecked extrinsic type as expected by this runtime.
 pub type UncheckedExtrinsic = generic::UncheckedExtrinsic<Address, Call, Signature, SignedExtra>;
