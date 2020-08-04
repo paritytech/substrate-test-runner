@@ -19,10 +19,9 @@ fn should_run_off_chain_worker() {
 			// })
 			.start(),
 	);
-	let mut runtime = tokio_compat::runtime::Runtime::new().unwrap();
-	runtime.block_on_std(async {
-		let chain_client = test.rpc::<rpc::ChainClient<Runtime>>();
-		let rpc_client = test.raw_rpc();
+	let chain_client = test.rpc::<rpc::ChainClient<Runtime>>();
+	let rpc_client = test.raw_rpc();
+	test.tokio_runtime().block_on_std(async {
 
 		// TODO [ToDr] This should be even rawer - allowing to pass JSON call,
 		// which in turn could be collected from the UI.
@@ -35,10 +34,10 @@ fn should_run_off_chain_worker() {
 		let header = chain_client.header(None).compat().await.unwrap();
 		println!("{:?}", header);
 
-		test.produce_blocks(15);
-
-		// test.assert_log_line("db", "best = true");
 	});
+
+	test.produce_blocks(15);
+	test.assert_log_line("db", "best = true");
 }
 
 #[test]
@@ -84,6 +83,7 @@ fn should_read_state() {
 }
 
 #[test]
+#[ignore] // wait_blocks not implemented yet.
 fn external_black_box() {
 	let test = test::blackbox_external::<Runtime>("ws://127.0.0.1:3001");
 	test.wait_blocks(5_u32);
