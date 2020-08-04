@@ -36,7 +36,7 @@ impl<Runtime: frame_system::Trait> Deterministic<Runtime> {
 
 		let keystore = KeyStore::new();
 
-		// here we load all the test keys (which have initial ballances)
+		// here we load all the test keys (which have initial balances)
 		// in the keyring into the keystore
 		for key in Keyring::iter() {
 			keystore

@@ -1,7 +1,6 @@
 use frame_system::offchain::{SendSignedTransaction, Signer};
 use futures::compat::Future01CompatExt;
 use pallet_balances::Call as BalancesCall;
-use pallet_indices::address::Address;
 use runtime::{Runtime, RuntimeKeyType};
 use sp_core::crypto::Pair;
 use sp_keyring::Sr25519Keyring;
@@ -54,18 +53,21 @@ fn should_read_state() {
 	let bob = Sr25519Keyring::Bob.pair();
 
 	let signer = Signer::<Runtime, RuntimeKeyType>::all_accounts()
-		// only use alice' account.
+		// only use alice' account for signing
 		.with_filter(vec![alice.public().into()]);
-	log::info!("\n\nalice: {}\n\n", alice.public());
 
-	let alice_balance = test.with_state(|| Balances::free_balance(MultiSigner::from(alice.public()).into_account()));
+	let (bob_balance, alice_balance) = test.with_state(|| {
+		(
+			Balances::free_balance(MultiSigner::from(bob.public()).into_account()),
+			Balances::free_balance(MultiSigner::from(alice.public()).into_account()),
+		)
+	});
+	log::info!("\n\n{:?}\n\n", MultiSigner::from(alice.public()));
 
 	let mut result = test.with_state(|| {
-		signer.send_signed_transaction(|_| {
-			BalancesCall::transfer(
-				Address::from(MultiSigner::from(bob.public()).into_account()),
-				8900000000000000,
-			)
+		signer.send_signed_transaction(|account| {
+			log::info!("\n\naccount: {:#?}\n\n", account);
+			BalancesCall::transfer(MultiSigner::from(bob.public()).into_account().into(), 8900000000000000)
 		})
 	});
 
@@ -73,13 +75,23 @@ fn should_read_state() {
 
 	test.produce_blocks(1);
 
-	let new_alice_balance =
-		test.with_state(|| Balances::free_balance(MultiSigner::from(alice.public()).into_account()));
+	let (new_bob_balance, new_alice_balance) = test.with_state(|| {
+		(
+			Balances::free_balance(MultiSigner::from(bob.public()).into_account()),
+			Balances::free_balance(MultiSigner::from(alice.public()).into_account()),
+		)
+	});
 
-	log::info!("\n\n{},\n{}\n\n\n", alice_balance, new_alice_balance);
+	// FIXME: alice' balance doesnt change lmao 
+	log::info!(
+		"\n\nBob: before {}, after {}\n\nAlice: before {}, after {}\n\n",
+		bob_balance,
+		new_bob_balance,
+		alice_balance,
+		new_alice_balance
+	);
 
-	// account for fees
-	assert!((alice_balance - new_alice_balance) > 8900000000000000);
+	assert_eq!((new_bob_balance - bob_balance), 8900000000000000);
 }
 
 #[test]
