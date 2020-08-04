@@ -1,6 +1,6 @@
 pub mod node;
 pub mod rpc;
-pub mod subxt;
+mod cli;
 pub mod test;
 pub mod types;
 

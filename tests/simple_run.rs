@@ -6,8 +6,8 @@ use runtime::{Runtime, RuntimeKeyType};
 use sp_core::crypto::Pair;
 use sp_keyring::Sr25519Keyring;
 use sp_runtime::{traits::IdentifyAccount, MultiSigner};
-use substrate_subxt::{balances::TransferCallExt, ClientBuilder, DefaultNodeRuntime, PairSigner};
-use substrate_test_runner::{prelude::*, rpc, subxt, test};
+use substrate_test_runner::{prelude::*, rpc, test};
+
 #[test]
 fn should_run_off_chain_worker() {
 	let mut test = test::deterministic(
@@ -48,7 +48,7 @@ fn should_read_state() {
 	let mut test = test::deterministic(test::node::<Runtime>().start());
 	type Balances = pallet_balances::Module<Runtime>;
 
-	// test.produce_blocks(1);
+	test.produce_blocks(1);
 
 	let alice = Sr25519Keyring::Alice.pair();
 	let bob = Sr25519Keyring::Bob.pair();
@@ -56,10 +56,11 @@ fn should_read_state() {
 	let signer = Signer::<Runtime, RuntimeKeyType>::all_accounts()
 		// only use alice' account.
 		.with_filter(vec![alice.public().into()]);
+	log::info!("\n\nalice: {}\n\n", alice.public());
 
 	let alice_balance = test.with_state(|| Balances::free_balance(MultiSigner::from(alice.public()).into_account()));
 
-	let result = test.with_state(|| {
+	let mut result = test.with_state(|| {
 		signer.send_signed_transaction(|_| {
 			BalancesCall::transfer(
 				Address::from(MultiSigner::from(bob.public()).into_account()),
@@ -68,12 +69,14 @@ fn should_read_state() {
 		})
 	});
 
-	log::info!("ext result: {:#?}", result);
+	assert!(result.pop().unwrap().1.is_ok());
 
 	test.produce_blocks(1);
 
 	let new_alice_balance =
 		test.with_state(|| Balances::free_balance(MultiSigner::from(alice.public()).into_account()));
+
+	log::info!("\n\n{},\n{}\n\n\n", alice_balance, new_alice_balance);
 
 	// account for fees
 	assert!((alice_balance - new_alice_balance) > 8900000000000000);

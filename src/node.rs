@@ -51,7 +51,7 @@ impl<Runtime> InternalNode<Runtime> {
 	}
 
 	pub fn new(logs: Logger, cli: &[String]) -> Self {
-		let cli = node_cli::Cli::from_iter(cli.iter());
+		let cli = crate::cli::Cli::from_iter(cli.iter());
 		let tokio_runtime = tokio_compat::runtime::Runtime::new().unwrap();
 		let newer_runtime = build_runtime().unwrap();
 		let runtime_handle = newer_runtime.handle().clone();

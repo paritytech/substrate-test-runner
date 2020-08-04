@@ -4,9 +4,11 @@ use sp_core::offchain::TransactionPool;
 use sp_externalities::Extensions;
 use sp_storage::{ChildInfo, StorageKey};
 use std::any::{Any, TypeId};
+use std::collections::HashMap;
 
 pub struct TestExternalities<Runtime: frame_system::Trait> {
 	client: rpc::StateClient<Runtime>,
+	overlay: HashMap<Vec<u8>, Option<Vec<u8>>>,
 	extensions: Extensions,
 }
 
@@ -34,6 +36,7 @@ impl<Runtime: frame_system::Trait> TestExternalities<Runtime> {
 	pub fn new(client: rpc::StateClient<Runtime>) -> Self {
 		Self {
 			client,
+			overlay: Default::default(),
 			extensions: Extensions::new(),
 		}
 	}
@@ -70,12 +73,15 @@ impl<Runtime: frame_system::Trait> sp_externalities::Externalities for TestExter
 	}
 
 	fn storage(&self, key: &[u8]) -> Option<Vec<u8>> {
+		if let Some(value) = self.overlay.get(key) {
+			return value.as_ref().cloned();
+		}
+
 		// this is pretty weird, but stay with me.
 		// the tests in `simple_run` is wrapped with a tokio runtime
 		// so this means the code path here has access to the tokio v0.1 runtime
-		// requried for this future to complete, without the runtime, this call would panic.
-		self.client
-			.storage(StorageKey(key.to_vec()), None)
+		// requried for this future to complete, without the runtime, this call would panic.		
+		self.client.storage(StorageKey(key.to_vec()), None)
 			.wait()
 			.ok()
 			.flatten()
@@ -114,9 +120,8 @@ impl<Runtime: frame_system::Trait> sp_externalities::Externalities for TestExter
 		unimplemented!("clear_child_prefix")
 	}
 
-	fn place_storage(&mut self, _key: Vec<u8>, _value: Option<Vec<u8>>) {
-		// Create a sudo transaction that alters storage on-chain.
-		unimplemented!("place_storage")
+	fn place_storage(&mut self, key: Vec<u8>, value: Option<Vec<u8>>) {
+		self.overlay.insert(key, value);
 	}
 
 	fn place_child_storage(&mut self, _child_info: &ChildInfo, _key: Vec<u8>, _value: Option<Vec<u8>>) {

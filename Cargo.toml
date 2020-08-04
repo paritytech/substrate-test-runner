@@ -3,15 +3,18 @@ name = "substrate-test-runner"
 version = "0.1.0"
 authors = ["Tomasz Drwięga <tomusdrw@gmail.com>"]
 edition = "2018"
+build = "build.rs"
 
 [workspace]
 members = [
     "runtime"
 ]
 
+[build-dependencies]
+substrate-build-script-utils = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
+
 [dependencies]
 runtime = { package = "test-runtime", path = "./runtime" }
-node-cli = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
 sc-executor = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
 
 sc-service = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
