@@ -1,12 +1,13 @@
 use substrate_test_runner::{test, rpc, prelude::*, subxt};
-use runtime::Runtime;
+use runtime::{Runtime, RuntimeKeyType};
 use futures::compat::Future01CompatExt;
 use substrate_subxt::{ClientBuilder, DefaultNodeRuntime, PairSigner, balances::TransferCallExt};
 use sp_core::crypto::Pair;
 use sp_runtime::{traits::IdentifyAccount, MultiSigner};
 use pallet_indices::address::Address;
 use sp_keyring::Sr25519Keyring;
-
+use frame_system::offchain::{SendSignedTransaction, Signer};
+use pallet_balances::Call as BalancesCall;
 #[test]
 fn should_run_off_chain_worker() {
     let mut test = test::deterministic(
@@ -47,32 +48,27 @@ fn should_read_state() {
 	let mut test = test::deterministic(test::node::<Runtime>().start());
 	type Balances = pallet_balances::Module<Runtime>;
 
-    test.produce_blocks(1);
+	// test.produce_blocks(1);
 
 	let alice = Sr25519Keyring::Alice.pair();
     let bob = Sr25519Keyring::Bob.pair();
-	let signer = PairSigner::new(alice.clone());
 
-	let rpc_handlers = test.rpc_handler();
-	
+	let signer = Signer::<Runtime, RuntimeKeyType>::all_accounts()
+		// only use alice' account.	
+		.with_filter(vec![alice.public().into()]);
+
 	let alice_balance = test.with_state(|| {
     	Balances::free_balance(MultiSigner::from(alice.public()).into_account())
-    });
+	});
 	
-	test.tokio_runtime()
-		.block_on_std(async {
-    		let client = ClientBuilder::<DefaultNodeRuntime>::new()
-    		    .set_client( subxt::SubxtClient::new(rpc_handlers))
-				.build()
-				.await
-				.unwrap();
+	let result = test.with_state(|| {
+		signer.send_signed_transaction(|_| {
+			BalancesCall::transfer(Address::from(MultiSigner::from(bob.public()).into_account()), 8900000000000000)
+		})
+	});
 
-			client
-				.transfer(&signer, &Address::from(MultiSigner::from(bob.public()).into_account()), 8900000000000000)
-				.await
-				.expect("failed to transfer funds");
+	log::info!("ext result: {:#?}", result);
 
-		});
  
 	test.produce_blocks(1);
 

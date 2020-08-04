@@ -13,6 +13,8 @@ use jsonrpc_core::MetaIoHandler;
 use futures::FutureExt;
 use std::marker::PhantomData;
 use sc_executor::native_executor_instance;
+use jsonrpc_core_client::transports::local;
+use jsonrpc_core_client::RpcChannel;
 
 // Our native executor instance.
 native_executor_instance!(
@@ -34,7 +36,7 @@ pub struct InternalNode<Runtime> {
 	rpc_handlers: Arc<MetaIoHandler<sc_rpc::Metadata>>,
 
 	/// tokio-compat runtime
-	tokio_runtime: tokio_compat::runtime::Runtime,
+	compat_runtime: tokio_compat::runtime::Runtime,
 
 	_runtime: tokio::runtime::Runtime,
 
@@ -74,7 +76,7 @@ impl<Runtime> InternalNode<Runtime> {
         Self {
             logs,
             _task_manager: Some(task_manager),
-			tokio_runtime: tokio_runtime,
+			compat_runtime: tokio_runtime,
 			_runtime: newer_runtime,
 			rpc_handlers: rpc_handlers.io_handler(),
 			_phantom: PhantomData,
@@ -84,9 +86,20 @@ impl<Runtime> InternalNode<Runtime> {
     pub fn rpc_handler(&self) -> Arc<MetaIoHandler<sc_rpc::Metadata>> {
         self.rpc_handlers.clone()
 	}
+
+	pub fn rpc_client<C>(&self) -> C
+	where
+		C: From<RpcChannel> + 'static,
+	{
+		use futures01::Future;
+	    let rpc_handler = self.rpc_handlers.clone();
+	    let (client, fut) = local::connect::<C, _, _>(rpc_handler);
+	    self.compat_runtime.spawn(fut.map_err(|_| ()));
+	    client
+	}
 	
 	pub fn tokio_runtime(&mut self) -> &mut tokio_compat::runtime::Runtime {
-		&mut self.tokio_runtime
+		&mut self.compat_runtime
 	}
 
     pub(crate) fn logs(&self) -> &Logger {

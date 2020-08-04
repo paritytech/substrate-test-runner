@@ -22,6 +22,7 @@ sc-rpc = { git = "https://github.com/paritytech/substrate.git", branch = "seun-s
 sc-consensus = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
 sp-core = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
 sc-transaction-pool = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
+sc-keystore = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
 
 sp-runtime = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
 sp-inherents = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
@@ -44,6 +45,7 @@ futures = { package = "futures", version = "0.3", features = ["compat"] }
 rand = "0.7"
 parking_lot = "0.10"
 tokio = { version = "0.2", features = ["full"] }
+sp-keyring = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
 
 # Calling RPC
 jsonrpc-core-client = { version = "14.2", features = ["ws"] }
@@ -57,5 +59,3 @@ primitive-types = "0.7"
 sp-externalities = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
 sp-storage = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
 
-[dev-dependencies]
-sp-keyring = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }

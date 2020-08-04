@@ -11,7 +11,7 @@ pub fn blackbox_internal<Runtime: Send + Sync>() -> blackbox::BlackBox<Runtime> 
     blackbox::BlackBox::new(blackbox::BlackBoxNode::Internal(node))
 }
 
-pub fn deterministic<Runtime: Send + Sync>(node: crate::node::InternalNode<Runtime>) -> deterministic::Deterministic<Runtime> {
+pub fn deterministic<Runtime: frame_system::Trait + Send + Sync>(node: crate::node::InternalNode<Runtime>) -> deterministic::Deterministic<Runtime> {
     deterministic::Deterministic::new(node)
 }
 

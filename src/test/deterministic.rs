@@ -3,30 +3,52 @@ use crate::{
     rpc::{self, RpcExtension},
 };
 use jsonrpc_core_client::RpcChannel;
-use crate::test::externalities::TestExternalities;
-use jsonrpc_core_client::transports::local;
+use crate::test::externalities::{TestExternalities, TxPoolExtApi};
 use manual_seal::rpc::ManualSealClient;
 use std::ops::{Deref, DerefMut};
+use sp_core::{
+	traits::KeystoreExt,
+	offchain::TransactionPoolExt,
+	testing::{KeyStore, SR25519},
+};
+use sp_externalities::{Externalities, ExternalitiesExt};
+use sp_keyring::sr25519::Keyring;
 
 /// A deterministic internal instance of substrate node.
-pub struct Deterministic<Runtime> {
-    node: InternalNode<Runtime>,
+pub struct Deterministic<Runtime: frame_system::Trait> {
+	node: InternalNode<Runtime>,
+	externalities: TestExternalities<Runtime>
 }
 
-impl<Runtime> rpc::RpcExtension for Deterministic<Runtime> {
+impl<Runtime: frame_system::Trait> rpc::RpcExtension for Deterministic<Runtime> {
     fn rpc<TClient: From<RpcChannel> + 'static>(&mut self) -> TClient {
-        use futures01::Future;
-        let rpc_handler = self.node.rpc_handler();
-        let (client, fut) = local::connect::<TClient, _, _>(rpc_handler);
-        self.node.tokio_runtime().spawn(fut.map_err(|_| ()));
-
-        client
+        self.node.rpc_client()
     }
 }
 
-impl<Runtime> Deterministic<Runtime> {
+impl<Runtime: frame_system::Trait> Deterministic<Runtime> {
     pub fn new(node: InternalNode<Runtime>) -> Self {
-        Self { node }
+		let mut externalities = TestExternalities::<Runtime>::new(node.rpc_client());
+		
+		(&mut externalities as &mut dyn Externalities)
+			.register_extension(TransactionPoolExt::new(TxPoolExtApi::<Runtime>::new(node.rpc_client())))
+			.expect("Failed to transaction register");
+
+		let keystore = KeyStore::new();
+
+		// here we load all the test keys (which have initial ballances)
+		// in the keyring into the keystore
+		for key in Keyring::iter() {
+			keystore.write()
+				.sr25519_generate_new(SR25519, Some(&format!("//{}", key)))
+				.expect("failed to add key to keystore: ");
+		}
+
+		(&mut externalities as &mut dyn Externalities)
+			.register_extension(KeystoreExt(keystore))
+			.expect("Failed to transaction register");
+
+		Self { node, externalities }
     }
 }
 
@@ -60,14 +82,14 @@ impl<Runtime: frame_system::Trait + Send + Sync> Deterministic<Runtime> {
 	}
 	
 
+	/// Execute closure in an externalities provided environment.
     pub fn with_state<R>(&mut self, closure: impl FnOnce() -> R) -> R {
-        TestExternalities::<Runtime>::new(self.rpc())
-            .execute_with(closure)
+		self.externalities.execute_with(closure)
 	}
 	
 }
 
-impl<T> Deref for Deterministic<T> {
+impl<T: frame_system::Trait> Deref for Deterministic<T> {
     type Target = InternalNode<T>;
 
     fn deref(&self) -> &Self::Target {
@@ -75,7 +97,7 @@ impl<T> Deref for Deterministic<T> {
     }
 }
 
-impl<T> DerefMut for Deterministic<T> {
+impl<T: frame_system::Trait> DerefMut for Deterministic<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.node
     }
