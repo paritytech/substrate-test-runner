@@ -2,21 +2,16 @@ pub mod blackbox;
 pub mod deterministic;
 pub mod externalities;
 
-pub fn blackbox_external<Runtime: Send>(url: &str) -> blackbox::BlackBox<Runtime> {
+use crate::node::InternalNode;
+
+pub fn blackbox_external<R: frame_system::Trait>(url: &str) -> blackbox::BlackBox<R> {
 	blackbox::BlackBox::new(blackbox::BlackBoxNode::External(url.into()))
 }
 
-pub fn blackbox_internal<Runtime: Send + Sync>() -> blackbox::BlackBox<Runtime> {
-	let node = crate::node::InternalNode::<Runtime>::builder().start();
+pub fn blackbox_internal<R: frame_system::Trait>(node: InternalNode) -> blackbox::BlackBox<R> {
 	blackbox::BlackBox::new(blackbox::BlackBoxNode::Internal(node))
 }
 
-pub fn deterministic<Runtime: frame_system::Trait + Send + Sync>(
-	node: crate::node::InternalNode<Runtime>,
-) -> deterministic::Deterministic<Runtime> {
+pub fn deterministic<R: frame_system::Trait>(node: InternalNode) -> deterministic::Deterministic<R> {
 	deterministic::Deterministic::new(node)
-}
-
-pub fn node<Runtime>() -> crate::node::InternalNodeBuilder<Runtime> {
-	crate::node::InternalNode::<Runtime>::builder()
 }

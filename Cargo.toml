@@ -24,10 +24,20 @@ sc-basic-authorship = { git = "https://github.com/paritytech/substrate.git", bra
 sc-rpc = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
 sc-consensus = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
 sp-core = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
+sp-blockchain = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
+sp-block-builder = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
+
+sp-api = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
+
 sc-transaction-pool = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
+sc-client-db = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
+sc-client-api = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
+sp-transaction-pool = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
 sc-keystore = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
 
 sp-runtime = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
+sp-session = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
+sp-offchain = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
 sp-inherents = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
 sp-timestamp = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
 frame-system = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }

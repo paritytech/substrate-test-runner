@@ -16,7 +16,7 @@ use std::ops::{Deref, DerefMut};
 
 /// A deterministic internal instance of substrate node.
 pub struct Deterministic<Runtime: frame_system::Trait> {
-	node: InternalNode<Runtime>,
+	node: InternalNode,
 	externalities: TestExternalities<Runtime>,
 }
 
@@ -27,7 +27,7 @@ impl<Runtime: frame_system::Trait> rpc::RpcExtension for Deterministic<Runtime> 
 }
 
 impl<Runtime: frame_system::Trait> Deterministic<Runtime> {
-	pub fn new(node: InternalNode<Runtime>) -> Self {
+	pub fn new(node: InternalNode) -> Self {
 		let mut externalities = TestExternalities::<Runtime>::new(node.rpc_client());
 
 		(&mut externalities as &mut dyn Externalities)
@@ -68,15 +68,12 @@ impl<Runtime: frame_system::Trait + Send + Sync> Deterministic<Runtime> {
 	}
 
 	pub fn produce_blocks(&mut self, num: usize) {
-		log::info!("produce blocks");
-
 		let client = self.rpc::<ManualSealClient<Runtime::Hash>>();
-		log::info!("produce blocks");
 
 		for _ in 0..num {
 			self.node
 				.tokio_runtime()
-				.block_on(client.create_block(true, true, None))
+				.block_on(client.create_block(true, false, None))
 				.expect("block production failed: ");
 		}
 		log::info!("sealed {} blocks", num)
@@ -89,7 +86,7 @@ impl<Runtime: frame_system::Trait + Send + Sync> Deterministic<Runtime> {
 }
 
 impl<T: frame_system::Trait> Deref for Deterministic<T> {
-	type Target = InternalNode<T>;
+	type Target = InternalNode;
 
 	fn deref(&self) -> &Self::Target {
 		&self.node

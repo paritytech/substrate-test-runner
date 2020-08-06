@@ -74,6 +74,7 @@ impl<Runtime: frame_system::Trait> sp_externalities::Externalities for TestExter
 
 	fn storage(&self, key: &[u8]) -> Option<Vec<u8>> {
 		if let Some(value) = self.overlay.get(key) {
+			log::info!("fetching from overlay: {:?}", key);
 			return value.as_ref().cloned();
 		}
 
@@ -121,6 +122,8 @@ impl<Runtime: frame_system::Trait> sp_externalities::Externalities for TestExter
 	}
 
 	fn place_storage(&mut self, key: Vec<u8>, value: Option<Vec<u8>>) {
+		log::info!("inserting into overlay: {:?}\n\n{:?}", key, value);
+
 		self.overlay.insert(key, value);
 	}
 

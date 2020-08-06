@@ -1,24 +1,27 @@
 use frame_system::offchain::{SendSignedTransaction, Signer};
 use futures::compat::Future01CompatExt;
 use pallet_balances::Call as BalancesCall;
-use runtime::{Runtime, RuntimeKeyType};
+use runtime::{Runtime, RuntimeApi, opaque::Block, RuntimeKeyType};
 use sp_core::crypto::Pair;
 use sp_keyring::Sr25519Keyring;
 use sp_runtime::{traits::IdentifyAccount, MultiSigner};
-use substrate_test_runner::{prelude::*, rpc, test};
+use substrate_test_runner::{prelude::*, rpc, test, node::start_node};
+use sc_executor::native_executor_instance;
+
+// Declare an instance of the native executor named `Executor`. Include the wasm binary as the
+// equivalent wasm code.
+native_executor_instance!(
+	pub Executor,
+	runtime::api::dispatch,
+	runtime::native_version,
+);
+
 
 #[test]
 fn should_run_off_chain_worker() {
-	let mut test = test::deterministic(
-		test::node::<Runtime>()
-			// TODO [ToDr] This does not work properly, since we have a shared logger.
-			.cli_param("-lsc_offchain=trace")
-			// .with_sudo(Keyring::Alice)
-			// .with_genesis_state(|| {
-			//     ...
-			// })
-			.start(),
-	);
+	let node = start_node::<Block, RuntimeApi, Executor>(&["-lsc_offchain=trace"]).unwrap();
+
+	let mut test = test::deterministic::<Runtime>(node);
 	let mut runtime = tokio_compat::runtime::Runtime::new().unwrap();
 	runtime.block_on_std(async {
 		let chain_client = test.rpc::<rpc::ChainClient<Runtime>>();
@@ -44,12 +47,13 @@ fn should_run_off_chain_worker() {
 #[test]
 fn should_read_state() {
 	// given
-	let mut test = test::deterministic(test::node::<Runtime>().start());
+	let node = start_node::<runtime::opaque::Block, runtime::RuntimeApi, Executor>(&[]).unwrap();
+	let mut test = test::deterministic::<Runtime>(node);
 	type Balances = pallet_balances::Module<Runtime>;
 
 	test.produce_blocks(1);
 
-	let alice = Sr25519Keyring::Alice.pair();
+	let alice = Sr25519Keyring::Charlie.pair();
 	let bob = Sr25519Keyring::Bob.pair();
 
 	let signer = Signer::<Runtime, RuntimeKeyType>::all_accounts()
@@ -57,16 +61,16 @@ fn should_read_state() {
 		.with_filter(vec![alice.public().into()]);
 
 	let (bob_balance, alice_balance) = test.with_state(|| {
+		let events = frame_system::Module::<Runtime>::events();
+		log::info!("{:#?}", events);
 		(
 			Balances::free_balance(MultiSigner::from(bob.public()).into_account()),
 			Balances::free_balance(MultiSigner::from(alice.public()).into_account()),
 		)
 	});
-	log::info!("\n\n{:?}\n\n", MultiSigner::from(alice.public()));
 
 	let mut result = test.with_state(|| {
-		signer.send_signed_transaction(|account| {
-			log::info!("\n\naccount: {:#?}\n\n", account);
+		signer.send_signed_transaction(|_account| {
 			BalancesCall::transfer(MultiSigner::from(bob.public()).into_account().into(), 8900000000000000)
 		})
 	});
@@ -76,17 +80,21 @@ fn should_read_state() {
 	test.produce_blocks(1);
 
 	let (new_bob_balance, new_alice_balance) = test.with_state(|| {
+		let events = frame_system::Module::<Runtime>::events();
+		log::info!("{:#?}", events);
 		(
 			Balances::free_balance(MultiSigner::from(bob.public()).into_account()),
 			Balances::free_balance(MultiSigner::from(alice.public()).into_account()),
 		)
 	});
 
-	// FIXME: alice' balance doesnt change lmao 
+	// FIXME: alice' balance doesnt change lmao
 	log::info!(
-		"\n\nBob: before {}, after {}\n\nAlice: before {}, after {}\n\n",
+		"\n\n{:#?}: before {}, after {}\n\n{:#?}: before {}, after {}\n\n",
+		MultiSigner::from(bob.public()),
 		bob_balance,
 		new_bob_balance,
+		MultiSigner::from(alice.public()),
 		alice_balance,
 		new_alice_balance
 	);
