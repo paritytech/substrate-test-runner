@@ -5,7 +5,7 @@ use runtime::{Runtime, RuntimeApi, opaque::Block, RuntimeKeyType};
 use sp_core::crypto::Pair;
 use sp_keyring::Sr25519Keyring;
 use sp_runtime::{traits::IdentifyAccount, MultiSigner};
-use substrate_test_runner::{prelude::*, rpc, test, node::start_node};
+use substrate_test_runner::{prelude::*, rpc, test, node::start_node, cli::spec_factory};
 use sc_executor::native_executor_instance;
 
 // Declare an instance of the native executor named `Executor`. Include the wasm binary as the
@@ -19,7 +19,7 @@ native_executor_instance!(
 
 #[test]
 fn should_run_off_chain_worker() {
-	let node = start_node::<Block, RuntimeApi, Executor>(&["-lsc_offchain=trace"]).unwrap();
+	let node = start_node::<Block, RuntimeApi, Executor, _>(&["-lsc_offchain=trace"], spec_factory).unwrap();
 
 	let mut test = test::deterministic::<Runtime>(node);
 	let mut runtime = tokio_compat::runtime::Runtime::new().unwrap();
@@ -47,7 +47,7 @@ fn should_run_off_chain_worker() {
 #[test]
 fn should_read_state() {
 	// given
-	let node = start_node::<runtime::opaque::Block, runtime::RuntimeApi, Executor>(&[]).unwrap();
+	let node = start_node::<runtime::opaque::Block, runtime::RuntimeApi, Executor, _>(&[], spec_factory).unwrap();
 	let mut test = test::deterministic::<Runtime>(node);
 	type Balances = pallet_balances::Module<Runtime>;
 

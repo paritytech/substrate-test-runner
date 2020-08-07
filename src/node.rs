@@ -2,7 +2,7 @@ use futures::FutureExt;
 use jsonrpc_core::MetaIoHandler;
 use jsonrpc_core_client::{transports::local, RpcChannel};
 use parking_lot::RwLock;
-use sc_cli::{build_runtime, SubstrateCli};
+use sc_cli::{build_runtime, SubstrateCli, ChainSpecFactory};
 use sc_executor::NativeExecutionDispatch;
 use sc_service::{
 	build_network, new_full_parts, spawn_tasks, BuildNetworkParams,	SpawnTasksParams,
@@ -115,11 +115,12 @@ pub fn build_logger() -> Logger {
 }
 
 /// starts a manual seal authorship task.
-pub fn start_node<Block, RuntimeApi, Executor>(cli_args: &[&str])
+pub fn start_node<Block, RuntimeApi, Executor, F>(cli_args: &[&str], spec_factory: F)
 	-> Result<InternalNode, sc_service::Error>
 	where
 		Block: BlockT,
 		Executor: NativeExecutionDispatch + 'static,
+		F: ChainSpecFactory,
 		RuntimeApi: ConstructRuntimeApi<Block, TFullClient<Block, RuntimeApi, Executor>> + Send + Sync + 'static,
 		<RuntimeApi as ConstructRuntimeApi<Block, TFullClient<Block, RuntimeApi, Executor>>>::RuntimeApi:
 			Core<Block> + Metadata<Block> + OffchainWorkerApi<Block> + TaggedTransactionQueue<Block>
@@ -143,8 +144,8 @@ pub fn start_node<Block, RuntimeApi, Executor>(cli_args: &[&str])
 		"--no-telemetry",
 	];
 	args.push(&base_path);
-
 	args.extend(cli_args.iter().cloned());
+
 	let cli = Cli::from_iter(args);
 	let compat_runtime = tokio_compat::runtime::Runtime::new().unwrap();
 	let tokio_runtime = build_runtime().unwrap();
@@ -157,8 +158,11 @@ pub fn start_node<Block, RuntimeApi, Executor>(cli_args: &[&str])
 			.map(drop),
 	};
 
-	let config = cli.create_configuration(&cli.run, TaskExecutor::from(task_executor))
-		.expect("failed to create node config");
+	let config = cli.create_configuration(
+		&cli.run,
+		spec_factory,
+		TaskExecutor::from(task_executor)
+	).expect("failed to create node config");
 
 	let (client, backend, keystore, mut task_manager) = new_full_parts::<Block, RuntimeApi, Executor>(&config)?;
 	let client = Arc::new(client);

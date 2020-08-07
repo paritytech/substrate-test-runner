@@ -1,6 +1,6 @@
 pub mod node;
 pub mod rpc;
-mod cli;
+pub mod cli;
 pub mod test;
 pub mod types;
 

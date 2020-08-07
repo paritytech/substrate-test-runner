@@ -41,11 +41,6 @@ impl SubstrateCli for Cli {
 		2017
 	}
 
-	fn load_spec(&self, _: &str) -> Result<Box<dyn sc_service::ChainSpec>, String> {
-		// we supply our own chainspec
-		Ok(Box::new(development_config()?))
-	}
-
 	fn native_runtime_version(_: &Box<dyn sc_cli::ChainSpec>) -> &'static RuntimeVersion {
 		&runtime::VERSION
 	}
@@ -61,6 +56,11 @@ pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Pu
 }
 
 type AccountPublic = <Signature as Verify>::Signer;
+
+pub fn spec_factory(_: String) -> Result<Box<dyn sc_service::ChainSpec>, String> {
+	// we supply our own chainspec
+	Ok(Box::new(development_config()?))
+}
 
 /// Generate an account ID from seed.
 pub fn get_account_id_from_seed<TPublic: Public>(seed: &str) -> AccountId
