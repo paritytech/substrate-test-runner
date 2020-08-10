@@ -18,6 +18,8 @@ runtime = { package = "test-runtime", path = "./runtime" }
 sc-executor = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
 
 sc-service = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
+sc-informant = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
+sc-network = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
 sc-cli = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
 sc-rpc-api = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
 sc-basic-authorship = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }

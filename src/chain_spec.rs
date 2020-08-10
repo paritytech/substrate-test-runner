@@ -1,50 +1,11 @@
 use runtime::{
-	AccountId, BalancesConfig, GenesisConfig, IndicesConfig, Signature, SudoConfig, SystemConfig, WASM_BINARY,
+	AccountId, Signature, WASM_BINARY,
+	BalancesConfig, GenesisConfig, IndicesConfig, SudoConfig, SystemConfig,
 };
-use sc_cli::{RunCmd, RuntimeVersion, Subcommand, SubstrateCli};
 use sc_service::ChainType;
 use sp_core::{sr25519, Pair, Public};
 use sp_runtime::traits::{IdentifyAccount, Verify};
-use structopt::StructOpt;
 
-#[derive(Debug, StructOpt)]
-pub struct Cli {
-	#[structopt(subcommand)]
-	pub subcommand: Option<Subcommand>,
-
-	#[structopt(flatten)]
-	pub run: RunCmd,
-}
-
-impl SubstrateCli for Cli {
-	fn impl_name() -> String {
-		"Substrate Node".into()
-	}
-
-	fn impl_version() -> String {
-		env!("SUBSTRATE_CLI_IMPL_VERSION").into()
-	}
-
-	fn description() -> String {
-		env!("CARGO_PKG_DESCRIPTION").into()
-	}
-
-	fn author() -> String {
-		env!("CARGO_PKG_AUTHORS").into()
-	}
-
-	fn support_url() -> String {
-		"support.anonymous.an".into()
-	}
-
-	fn copyright_start_year() -> i32 {
-		2017
-	}
-
-	fn native_runtime_version(_: &Box<dyn sc_cli::ChainSpec>) -> &'static RuntimeVersion {
-		&runtime::VERSION
-	}
-}
 /// Specialized `ChainSpec`. This is a specialization of the general Substrate ChainSpec type.
 pub type ChainSpec = sc_service::GenericChainSpec<GenesisConfig>;
 
@@ -97,13 +58,9 @@ pub fn development_config() -> Result<ChainSpec, String> {
 			)
 		},
 		vec![],
-		// Telemetry
 		None,
-		// Protocol ID
 		None,
-		// Properties
 		None,
-		// Extensions
 		None,
 	))
 }

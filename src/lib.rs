@@ -1,6 +1,6 @@
 pub mod node;
 pub mod rpc;
-pub mod cli;
+pub mod chain_spec;
 pub mod test;
 pub mod types;
 

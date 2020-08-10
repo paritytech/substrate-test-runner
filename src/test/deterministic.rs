@@ -13,25 +13,27 @@ use sp_core::{
 use sp_externalities::{Externalities, ExternalitiesExt};
 use sp_keyring::sr25519::Keyring;
 use std::ops::{Deref, DerefMut};
+use crate::node::TestRuntimeRequirements;
+use sp_runtime::traits::Block as BlockT;
 
 /// A deterministic internal instance of substrate node.
-pub struct Deterministic<Runtime: frame_system::Trait> {
-	node: InternalNode,
-	externalities: TestExternalities<Runtime>,
+pub struct Deterministic<Node: TestRuntimeRequirements> {
+	node: InternalNode<Node>,
+	externalities: TestExternalities<Node>,
 }
 
-impl<Runtime: frame_system::Trait> rpc::RpcExtension for Deterministic<Runtime> {
+impl<Node: TestRuntimeRequirements> rpc::RpcExtension for Deterministic<Node> {
 	fn rpc<TClient: From<RpcChannel> + 'static>(&mut self) -> TClient {
 		self.node.rpc_client()
 	}
 }
 
-impl<Runtime: frame_system::Trait> Deterministic<Runtime> {
-	pub fn new(node: InternalNode) -> Self {
-		let mut externalities = TestExternalities::<Runtime>::new(node.rpc_client());
+impl<Node: TestRuntimeRequirements + 'static> Deterministic<Node> {
+	pub fn new(node: InternalNode<Node>) -> Self {
+		let mut externalities = TestExternalities::<Node>::new(node.rpc_client());
 
 		(&mut externalities as &mut dyn Externalities)
-			.register_extension(TransactionPoolExt::new(TxPoolExtApi::<Runtime>::new(node.rpc_client())))
+			.register_extension(TransactionPoolExt::new(TxPoolExtApi::<Node>::new(node.rpc_client())))
 			.expect("Failed to transaction register");
 
 		let keystore = KeyStore::new();
@@ -53,7 +55,7 @@ impl<Runtime: frame_system::Trait> Deterministic<Runtime> {
 	}
 }
 
-impl<Runtime: frame_system::Trait + Send + Sync> Deterministic<Runtime> {
+impl<Node: TestRuntimeRequirements> Deterministic<Node> {
 	pub fn assert_log_line(&self, module: &str, content: &str) {
 		if let Some(logs) = self.node.logs().read().get(module) {
 			for log in logs {
@@ -68,7 +70,7 @@ impl<Runtime: frame_system::Trait + Send + Sync> Deterministic<Runtime> {
 	}
 
 	pub fn produce_blocks(&mut self, num: usize) {
-		let client = self.rpc::<ManualSealClient<Runtime::Hash>>();
+		let client = self.rpc::<ManualSealClient<<Node::OpaqueBlock as BlockT>::Hash>>();
 
 		for _ in 0..num {
 			self.node
@@ -85,15 +87,15 @@ impl<Runtime: frame_system::Trait + Send + Sync> Deterministic<Runtime> {
 	}
 }
 
-impl<T: frame_system::Trait> Deref for Deterministic<T> {
-	type Target = InternalNode;
+impl<T: TestRuntimeRequirements> Deref for Deterministic<T> {
+	type Target = InternalNode<T>;
 
 	fn deref(&self) -> &Self::Target {
 		&self.node
 	}
 }
 
-impl<T: frame_system::Trait> DerefMut for Deterministic<T> {
+impl<T: TestRuntimeRequirements> DerefMut for Deterministic<T> {
 	fn deref_mut(&mut self) -> &mut Self::Target {
 		&mut self.node
 	}

@@ -4,37 +4,39 @@ use crate::{
 	rpc::{self, RpcExtension},
 	types,
 };
-use std::marker::PhantomData;
 use jsonrpc_core_client::{transports::local, RpcChannel};
+use crate::node::TestRuntimeRequirements;
 
-pub enum BlackBoxNode {
+/// A black box node, either runs a manual seal background node,
+/// or connects via ws to a running node.
+pub enum BlackBoxNode<N> {
 	/// Connects to an external node.
 	External(String),
 	/// Spawns a pristine node.
-	Internal(InternalNode),
+	Internal(InternalNode<N>),
 }
 
 /// A black box test.
-pub struct BlackBox<R> {
-	node: BlackBoxNode,
-	_phantom: PhantomData<R>
+pub struct BlackBox<N> {
+	node: BlackBoxNode<N>,
 }
 
-impl<R> BlackBox<R>
+impl<N> BlackBox<N>
 	where
-		R: frame_system::Trait,
+		N: TestRuntimeRequirements,
 {
-	pub async fn with_state<T>(&mut self, closure: impl FnOnce() -> T) -> T {
-		TestExternalities::<R>::new(self.rpc()).execute_with(closure)
+	/// Execute provided `Fn` in an externalities provided environment.
+	pub async fn with_state<T>(&mut self, func: impl FnOnce() -> T) -> T {
+		TestExternalities::<N>::new(self.rpc()).execute_with(func)
 	}
 	
 	/// Wait `number` of blocks.
-	pub fn wait_blocks(&self, _number: impl Into<types::BlockNumber<R>>) {
+	pub fn wait_blocks(&self, _number: impl Into<types::BlockNumber<N::Runtime>>) {
 		todo!()
 	}
 }
 
-impl<R> rpc::RpcExtension for BlackBox<R> {
+impl<N> rpc::RpcExtension for BlackBox<N> {
 	fn rpc<TClient: From<RpcChannel> + 'static>(&mut self) -> TClient {
 		let client = match self.node {
 			BlackBoxNode::External(ref url) => futures::executor::block_on(rpc::connect_ws(&url)).unwrap(),
@@ -50,8 +52,9 @@ impl<R> rpc::RpcExtension for BlackBox<R> {
 	}
 }
 
-impl<R> BlackBox<R>{
-	pub fn new(node: BlackBoxNode) -> Self {
-		Self { node, _phantom: PhantomData }
+impl<N> BlackBox<N>{
+	/// Create an instance of `BlackBox`.
+	pub fn new(node: BlackBoxNode<N>) -> Self {
+		Self { node }
 	}
 }

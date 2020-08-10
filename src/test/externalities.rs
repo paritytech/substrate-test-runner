@@ -5,18 +5,19 @@ use sp_externalities::Extensions;
 use sp_storage::{ChildInfo, StorageKey};
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
+use crate::node::TestRuntimeRequirements;
 
-pub struct TestExternalities<Runtime: frame_system::Trait> {
-	client: rpc::StateClient<Runtime>,
+pub struct TestExternalities<Node: TestRuntimeRequirements> {
+	client: rpc::StateClient<Node::Runtime>,
 	overlay: HashMap<Vec<u8>, Option<Vec<u8>>>,
 	extensions: Extensions,
 }
 
-pub struct TxPoolExtApi<Runtime: frame_system::Trait> {
-	client: rpc::AuthorClient<Runtime>,
+pub struct TxPoolExtApi<Node: TestRuntimeRequirements> {
+	client: rpc::AuthorClient<Node::Runtime>,
 }
 
-impl<Runtime: frame_system::Trait> TransactionPool for TxPoolExtApi<Runtime> {
+impl<Node: TestRuntimeRequirements> TransactionPool for TxPoolExtApi<Node> {
 	fn submit_transaction(&mut self, extrinsic: Vec<u8>) -> Result<(), ()> {
 		match self.client.submit_extrinsic(extrinsic.into()).wait() {
 			Ok(hash) => log::info!("extrinsic successfully submitted with hash {:?}", hash),
@@ -26,14 +27,14 @@ impl<Runtime: frame_system::Trait> TransactionPool for TxPoolExtApi<Runtime> {
 	}
 }
 
-impl<Runtime: frame_system::Trait> TxPoolExtApi<Runtime> {
-	pub fn new(client: rpc::AuthorClient<Runtime>) -> Self {
+impl<Node: TestRuntimeRequirements> TxPoolExtApi<Node> {
+	pub fn new(client: rpc::AuthorClient<Node::Runtime>) -> Self {
 		Self { client }
 	}
 }
 
-impl<Runtime: frame_system::Trait> TestExternalities<Runtime> {
-	pub fn new(client: rpc::StateClient<Runtime>) -> Self {
+impl<Node: TestRuntimeRequirements> TestExternalities<Node> {
+	pub fn new(client: rpc::StateClient<Node::Runtime>) -> Self {
 		Self {
 			client,
 			overlay: Default::default(),
@@ -46,7 +47,7 @@ impl<Runtime: frame_system::Trait> TestExternalities<Runtime> {
 	}
 }
 
-impl<Runtime: frame_system::Trait> sp_externalities::ExtensionStore for TestExternalities<Runtime> {
+impl<Node: TestRuntimeRequirements> sp_externalities::ExtensionStore for TestExternalities<Node> {
 	fn extension_by_type_id(&mut self, type_id: TypeId) -> Option<&mut dyn Any> {
 		self.extensions.get_mut(type_id)
 	}
@@ -67,7 +68,7 @@ impl<Runtime: frame_system::Trait> sp_externalities::ExtensionStore for TestExte
 	}
 }
 
-impl<Runtime: frame_system::Trait> sp_externalities::Externalities for TestExternalities<Runtime> {
+impl<Node: TestRuntimeRequirements> sp_externalities::Externalities for TestExternalities<Node> {
 	fn set_offchain_storage(&mut self, _key: &[u8], _value: Option<&[u8]>) {
 		unimplemented!("set_offchain_storage")
 	}

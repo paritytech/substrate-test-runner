@@ -1,11 +1,14 @@
 use frame_system::offchain::{SendSignedTransaction, Signer};
 use futures::compat::Future01CompatExt;
 use pallet_balances::Call as BalancesCall;
-use runtime::{Runtime, RuntimeApi, opaque::Block, RuntimeKeyType};
+use runtime::{Runtime, RuntimeKeyType};
 use sp_core::crypto::Pair;
 use sp_keyring::Sr25519Keyring;
 use sp_runtime::{traits::IdentifyAccount, MultiSigner};
-use substrate_test_runner::{prelude::*, rpc, test, node::start_node, cli::spec_factory};
+use substrate_test_runner::{
+	prelude::*, rpc, test, node::{InternalNode, TestRuntimeRequirements},
+	chain_spec::spec_factory,
+};
 use sc_executor::native_executor_instance;
 
 // Declare an instance of the native executor named `Executor`. Include the wasm binary as the
@@ -16,12 +19,20 @@ native_executor_instance!(
 	runtime::native_version,
 );
 
+struct Node;
+
+impl TestRuntimeRequirements for Node {
+	type OpaqueBlock = runtime::opaque::Block;
+	type Executor = Executor;
+	type Runtime = runtime::Runtime;
+	type RuntimeApi = runtime::RuntimeApi;
+}
 
 #[test]
 fn should_run_off_chain_worker() {
-	let node = start_node::<Block, RuntimeApi, Executor, _>(&["-lsc_offchain=trace"], spec_factory).unwrap();
+	let node = InternalNode::<Node>::new(spec_factory).unwrap();
 
-	let mut test = test::deterministic::<Runtime>(node);
+	let mut test = test::deterministic(node);
 	let mut runtime = tokio_compat::runtime::Runtime::new().unwrap();
 	runtime.block_on_std(async {
 		let chain_client = test.rpc::<rpc::ChainClient<Runtime>>();
@@ -40,21 +51,25 @@ fn should_run_off_chain_worker() {
 
 		test.produce_blocks(15);
 
-		// test.assert_log_line("db", "best = true");
+		test.assert_log_line("db", "best = true");
 	});
 }
 
 #[test]
 fn should_read_state() {
 	// given
-	let node = start_node::<runtime::opaque::Block, runtime::RuntimeApi, Executor, _>(&[], spec_factory).unwrap();
-	let mut test = test::deterministic::<Runtime>(node);
+	let node = InternalNode::<Node>::new(spec_factory).unwrap();
+	let mut test = test::deterministic(node);
 	type Balances = pallet_balances::Module<Runtime>;
 
 	test.produce_blocks(1);
 
-	let alice = Sr25519Keyring::Charlie.pair();
+	let alice = Sr25519Keyring::Alice.pair();
 	let bob = Sr25519Keyring::Bob.pair();
+	let (alice_public, bob_public) = (
+		alice.public(),
+		bob.public(),
+	);
 
 	let signer = Signer::<Runtime, RuntimeKeyType>::all_accounts()
 		// only use alice' account for signing
@@ -64,14 +79,14 @@ fn should_read_state() {
 		let events = frame_system::Module::<Runtime>::events();
 		log::info!("{:#?}", events);
 		(
-			Balances::free_balance(MultiSigner::from(bob.public()).into_account()),
-			Balances::free_balance(MultiSigner::from(alice.public()).into_account()),
+			Balances::free_balance(MultiSigner::from(bob_public).into_account()),
+			Balances::free_balance(MultiSigner::from(alice_public).into_account()),
 		)
 	});
 
 	let mut result = test.with_state(|| {
 		signer.send_signed_transaction(|_account| {
-			BalancesCall::transfer(MultiSigner::from(bob.public()).into_account().into(), 8900000000000000)
+			BalancesCall::transfer(MultiSigner::from(bob_public).into_account().into(), 8900000000000000)
 		})
 	});
 
@@ -83,18 +98,18 @@ fn should_read_state() {
 		let events = frame_system::Module::<Runtime>::events();
 		log::info!("{:#?}", events);
 		(
-			Balances::free_balance(MultiSigner::from(bob.public()).into_account()),
-			Balances::free_balance(MultiSigner::from(alice.public()).into_account()),
+			Balances::free_balance(MultiSigner::from(bob_public).into_account()),
+			Balances::free_balance(MultiSigner::from(alice_public).into_account()),
 		)
 	});
 
 	// FIXME: alice' balance doesnt change lmao
 	log::info!(
 		"\n\n{:#?}: before {}, after {}\n\n{:#?}: before {}, after {}\n\n",
-		MultiSigner::from(bob.public()),
+		MultiSigner::from(bob_public),
 		bob_balance,
 		new_bob_balance,
-		MultiSigner::from(alice.public()),
+		MultiSigner::from(alice_public),
 		alice_balance,
 		new_alice_balance
 	);
@@ -104,7 +119,7 @@ fn should_read_state() {
 
 #[test]
 fn external_black_box() {
-	let test = test::blackbox_external::<Runtime>("ws://127.0.0.1:3001");
+	let test = test::blackbox_external::<Node>("ws://127.0.0.1:3001");
 	test.wait_blocks(5_u32);
 }
 
