@@ -1,11 +1,12 @@
 use std::io::Write;
 use std::sync::Arc;
+use std::marker::PhantomData;
 
 use futures::FutureExt;
 use jsonrpc_core::MetaIoHandler;
 use jsonrpc_core_client::{RpcChannel, transports::local};
 use parking_lot::RwLock;
-use sc_cli::{build_runtime, ChainSpecFactory};
+use sc_cli::build_runtime;
 use sc_client_api::{backend::Backend, execution_extensions::ExecutionStrategies};
 use sc_executor::NativeExecutionDispatch;
 use sc_informant::OutputFormat;
@@ -13,18 +14,24 @@ use sc_network::{config::TransportConfig, multiaddr};
 use sc_service::{
 	BasePath, build_network, BuildNetworkParams, Configuration, DatabaseConfig, new_full_parts,
 	Role, spawn_tasks, SpawnTasksParams, TaskExecutor, TaskManager, TaskType, TFullBackend, TFullClient,
+	config::{KeystoreConfig, NetworkConfiguration, WasmExecutionMethod},
 };
-use sc_service::config::{KeystoreConfig, NetworkConfiguration, WasmExecutionMethod};
 use sc_transaction_pool::BasicPool;
-use sp_api::{ApiErrorExt, ApiExt, ConstructRuntimeApi, Core, Metadata};
+use sp_api::{ApiErrorExt, ApiExt, ConstructRuntimeApi, Core, Metadata, ProvideRuntimeApi};
 use sp_block_builder::BlockBuilder;
 use sp_inherents::InherentDataProviders;
 use sp_keyring::Sr25519Keyring;
 use sp_offchain::OffchainWorkerApi;
-use sp_runtime::traits::Block as BlockT;
+use sp_runtime::traits::{Block as BlockT, NumberFor};
 use sp_session::SessionKeys;
 use sp_transaction_pool::runtime_api::TaggedTransactionQueue;
-use std::marker::PhantomData;
+use manual_seal::{
+	run_manual_seal, ManualSealParams,
+	consensus::{ConsensusDataProvider, babe::BabeConsensusDataProvider},
+};
+use sp_consensus_babe::BabeApi;
+use crate::chain_spec::ChainSpecFactory;
+use sp_runtime::generic::BlockId;
 
 type Module = String;
 type Logger = Arc<RwLock<std::collections::HashMap<Module, Vec<String>>>>;
@@ -52,7 +59,9 @@ pub struct InternalNode<Node> {
 
 impl<Node> InternalNode<Node> {
 	/// Starts a node with the manual-seal authorship,
-	pub fn new<SpecFactory>(spec_factory: SpecFactory) -> Result<Self, sc_service::Error>
+	pub fn new<SpecFactory>(
+		spec_factory: SpecFactory,
+	) -> Result<Self, sc_service::Error>
 		where
 			Node: TestRuntimeRequirements,
 			<Node::RuntimeApi as
@@ -61,10 +70,12 @@ impl<Node> InternalNode<Node> {
 				Core<Node::OpaqueBlock> + Metadata<Node::OpaqueBlock> + OffchainWorkerApi<Node::OpaqueBlock>
 				+ SessionKeys<Node::OpaqueBlock> + TaggedTransactionQueue<Node::OpaqueBlock>
 				+ BlockBuilder<Node::OpaqueBlock> + ApiErrorExt<Error=sp_blockchain::Error>
+				+ BabeApi<Node::OpaqueBlock, Error = sp_blockchain::Error>
 				+ ApiExt<
 					Node::OpaqueBlock,
 					StateBackend= <TFullBackend<Node::OpaqueBlock> as Backend<Node::OpaqueBlock>>::State
 				>,
+			NumberFor<Node::OpaqueBlock>: finality_grandpa::BlockNumberOps,
 			SpecFactory: ChainSpecFactory,
 	{
 		let logger = build_logger();
@@ -85,7 +96,24 @@ impl<Node> InternalNode<Node> {
 		let (client, backend, keystore, mut task_manager) =
 			new_full_parts::<Node::OpaqueBlock, Node::RuntimeApi, Node::Executor>(&config)?;
 		let client = Arc::new(client);
-		let import_queue = manual_seal::import_queue(Box::new(client.clone()), &task_manager.spawn_handle(), None);
+		let select_chain = sc_consensus::LongestChain::new(backend.clone());
+
+		let (grandpa_block_import, ..) = sc_finality_grandpa::block_import(
+			client.clone(),
+			&(client.clone() as Arc<_>),
+			select_chain.clone(),
+		)?;
+
+		let (block_import, babe_link) = sc_consensus_babe::block_import(
+			sc_consensus_babe::Config::get_or_compute(&*client)?,
+			grandpa_block_import,
+			client.clone(),
+		)?;
+		let import_queue = manual_seal::import_queue(
+			Box::new(block_import.clone()),
+			&task_manager.spawn_handle(),
+			None
+		);
 
 		let transaction_pool = BasicPool::new_full(
 			config.transaction_pool.clone(),
@@ -94,7 +122,7 @@ impl<Node> InternalNode<Node> {
 			client.clone(),
 		);
 
-		let (network, network_status_sinks, system_rpc_tx) = {
+		let (network, network_status_sinks, system_rpc_tx, network_starter) = {
 			let params = BuildNetworkParams {
 				config: &config,
 				client: client.clone(),
@@ -110,7 +138,7 @@ impl<Node> InternalNode<Node> {
 		};
 
 		// Proposer object for block authorship.
-		let proposer = sc_basic_authorship::ProposerFactory::new(
+		let env = sc_basic_authorship::ProposerFactory::new(
 			client.clone(),
 			transaction_pool.clone(),
 			config.prometheus_registry(),
@@ -125,10 +153,10 @@ impl<Node> InternalNode<Node> {
 				client: client.clone(),
 				backend: backend.clone(),
 				task_manager: &mut task_manager,
-				keystore,
+				keystore: keystore.clone(),
 				on_demand: None,
 				transaction_pool: transaction_pool.clone(),
-				rpc_extensions_builder: Box::new(move |_| {
+				rpc_extensions_builder: Box::new(move |_, _| {
 					use manual_seal::rpc;
 					let mut io = jsonrpc_core::IoHandler::default();
 					io.extend_with({
@@ -153,23 +181,31 @@ impl<Node> InternalNode<Node> {
 			.register_provider(sp_timestamp::InherentDataProvider)
 			.expect("failed to register timestamp inherent");
 
-		let select_chain = sc_consensus::LongestChain::new(backend.clone());
+		let digest_provider = BabeConsensusDataProvider::new(
+			client.clone(),
+			keystore,
+			&inherent_data_providers,
+			babe_link.epoch_changes().clone(),
+		).expect("failed to create DigestProvider");
 
 		// Background authorship future.
-		let authorship_future = manual_seal::run_manual_seal(
-			Box::new(client.clone()),
-			proposer,
+		let authorship_future = run_manual_seal(ManualSealParams {
+			block_import,
+			env,
 			client,
-			transaction_pool.pool().clone(),
+			pool: transaction_pool.pool().clone(),
 			commands_stream,
 			select_chain,
+			digest_provider: Some(Box::new(digest_provider)),
 			inherent_data_providers,
-		);
+		});
 
 		// spawn the authorship task as an essential task.
 		task_manager
 			.spawn_essential_handle()
 			.spawn("manual-seal", authorship_future);
+
+		network_starter.start_network();
 
 		Ok(Self {
 			rpc_handlers: rpc_handlers.io_handler(),

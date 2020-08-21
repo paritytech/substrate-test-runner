@@ -11,41 +11,50 @@ members = [
 ]
 
 [build-dependencies]
-substrate-build-script-utils = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
+substrate-build-script-utils = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 
 [dependencies]
-runtime = { package = "test-runtime", path = "./runtime" }
-sc-executor = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
+# client deps
+sc-executor = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-service = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-informant = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-network = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-cli = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-rpc-api = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-basic-authorship = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-rpc = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-consensus = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-finality-grandpa = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-consensus-babe = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 
-sc-service = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
-sc-informant = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
-sc-network = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
-sc-cli = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
-sc-rpc-api = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
-sc-basic-authorship = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
-sc-rpc = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
-sc-consensus = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
-sp-core = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
-sp-blockchain = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
-sp-block-builder = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
+sc-transaction-pool = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-client-db = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-client-api = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+manual-seal = { package = "sc-consensus-manual-seal", git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 
-sp-api = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
+# primitive deps
+sp-core = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-blockchain = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-block-builder = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-api = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-transaction-pool = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-consensus-babe = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-keystore = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-runtime = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-session = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-offchain = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-inherents = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-timestamp = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-keyring = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-externalities = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-storage = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 
-sc-transaction-pool = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
-sc-client-db = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
-sc-client-api = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
-sp-transaction-pool = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
-sc-keystore = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
+# pallets
+frame-system = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+pallet-balances = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+pallet-indices = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+finality-grandpa = "0.12.3"
 
-sp-runtime = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
-sp-session = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
-sp-offchain = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
-sp-inherents = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
-sp-timestamp = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
-frame-system = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
-pallet-balances = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
-pallet-indices = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
-manual-seal = { package = "sc-consensus-manual-seal", git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
 parity-scale-codec = "1.3.1"
 structopt = "0.3.15"
 env_logger = "0.7.1"
@@ -53,14 +62,12 @@ log = "0.4.8"
 hyper = "0.12.35"
 serde_json = "1.0"
 derive_more = "0.99.9"
-substrate-subxt = { git = "https://github.com/paritytech/substrate-subxt.git", branch = "seun-substrate-test-runner" }
 jsonrpsee = "0.1.0"
 futures01 = { package = "futures", version = "0.1.29" }
 futures = { package = "futures", version = "0.3", features = ["compat"] }
 rand = "0.7"
 parking_lot = "0.10"
 tokio = { version = "0.2", features = ["full"] }
-sp-keyring = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
 
 # Calling RPC
 jsonrpc-core-client = { version = "14.2", features = ["ws"] }
@@ -70,7 +77,10 @@ tokio-compat = { version = "0.1.6", features = ["rt-full"] }
 url = "1.7"
 primitive-types = "0.7"
 
-# Externalities
-sp-externalities = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
-sp-storage = { git = "https://github.com/paritytech/substrate.git", branch = "seun-substrate-test-runner" }
+runtime = { package = "test-runtime", path = "./runtime" }
+node-runtime = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+node-cli = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 
+[dev-dependencies]
+node-primitives = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+node-executor = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }

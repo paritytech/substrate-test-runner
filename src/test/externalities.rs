@@ -4,12 +4,10 @@ use sp_core::offchain::TransactionPool;
 use sp_externalities::Extensions;
 use sp_storage::{ChildInfo, StorageKey};
 use std::any::{Any, TypeId};
-use std::collections::HashMap;
 use crate::node::TestRuntimeRequirements;
 
 pub struct TestExternalities<Node: TestRuntimeRequirements> {
 	client: rpc::StateClient<Node::Runtime>,
-	overlay: HashMap<Vec<u8>, Option<Vec<u8>>>,
 	extensions: Extensions,
 }
 
@@ -37,7 +35,6 @@ impl<Node: TestRuntimeRequirements> TestExternalities<Node> {
 	pub fn new(client: rpc::StateClient<Node::Runtime>) -> Self {
 		Self {
 			client,
-			overlay: Default::default(),
 			extensions: Extensions::new(),
 		}
 	}
@@ -74,11 +71,6 @@ impl<Node: TestRuntimeRequirements> sp_externalities::Externalities for TestExte
 	}
 
 	fn storage(&self, key: &[u8]) -> Option<Vec<u8>> {
-		if let Some(value) = self.overlay.get(key) {
-			log::info!("fetching from overlay: {:?}", key);
-			return value.as_ref().cloned();
-		}
-
 		// this is pretty weird, but stay with me.
 		// the tests in `simple_run` is wrapped with a tokio runtime
 		// so this means the code path here has access to the tokio v0.1 runtime
@@ -122,10 +114,8 @@ impl<Node: TestRuntimeRequirements> sp_externalities::Externalities for TestExte
 		unimplemented!("clear_child_prefix")
 	}
 
-	fn place_storage(&mut self, key: Vec<u8>, value: Option<Vec<u8>>) {
-		log::info!("inserting into overlay: {:?}\n\n{:?}", key, value);
-
-		self.overlay.insert(key, value);
+	fn place_storage(&mut self, _key: Vec<u8>, _value: Option<Vec<u8>>) {
+		// no-op
 	}
 
 	fn place_child_storage(&mut self, _child_info: &ChildInfo, _key: Vec<u8>, _value: Option<Vec<u8>>) {

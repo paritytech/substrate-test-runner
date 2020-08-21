@@ -22,10 +22,10 @@ native_executor_instance!(
 struct Node;
 
 impl TestRuntimeRequirements for Node {
-	type OpaqueBlock = runtime::opaque::Block;
-	type Executor = Executor;
-	type Runtime = runtime::Runtime;
-	type RuntimeApi = runtime::RuntimeApi;
+	type OpaqueBlock = node_primitives::Block;
+	type Executor = node_executor::Executor;
+	type Runtime = node_runtime::Runtime;
+	type RuntimeApi = node_runtime::RuntimeApi;
 }
 
 #[test]
@@ -71,13 +71,12 @@ fn should_read_state() {
 		bob.public(),
 	);
 
-	let signer = Signer::<Runtime, RuntimeKeyType>::all_accounts()
+	let signer = Signer::<node_runtime::Runtime, RuntimeKeyType>::all_accounts()
 		// only use alice' account for signing
 		.with_filter(vec![alice.public().into()]);
 
 	let (bob_balance, alice_balance) = test.with_state(|| {
 		let events = frame_system::Module::<Runtime>::events();
-		log::info!("{:#?}", events);
 		(
 			Balances::free_balance(MultiSigner::from(bob_public).into_account()),
 			Balances::free_balance(MultiSigner::from(alice_public).into_account()),

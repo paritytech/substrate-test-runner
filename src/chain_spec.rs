@@ -9,6 +9,22 @@ use sp_runtime::traits::{IdentifyAccount, Verify};
 /// Specialized `ChainSpec`. This is a specialization of the general Substrate ChainSpec type.
 pub type ChainSpec = sc_service::GenericChainSpec<GenesisConfig>;
 
+/// Chain spec factory, allows for creating different chain specs, given different
+/// chain_id's.
+pub trait ChainSpecFactory {
+	/// produces a chain spec given a valid chain_id.
+	fn load_spec(&self, id: String) -> Result<Box<dyn sc_service::ChainSpec>, String>;
+}
+
+impl<F> ChainSpecFactory for F
+	where
+		F: Fn(String) -> Result<Box<dyn sc_service::ChainSpec>, String>
+{
+	fn load_spec(&self, id: String) -> Result<Box<dyn sc_service::ChainSpec>, String> {
+		(self)(id)
+	}
+}
+
 /// Generate a crypto pair from seed.
 pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Public {
 	TPublic::Pair::from_string(&format!("//{}", seed), None)
@@ -20,7 +36,7 @@ type AccountPublic = <Signature as Verify>::Signer;
 
 pub fn spec_factory(_: String) -> Result<Box<dyn sc_service::ChainSpec>, String> {
 	// we supply our own chainspec
-	Ok(Box::new(development_config()?))
+	Ok(Box::new(node_cli::chain_spec::development_config()))
 }
 
 /// Generate an account ID from seed.
@@ -38,7 +54,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 		ChainType::Development,
 		move || {
 			testnet_genesis(
-				WASM_BINARY,
+				node_runtime::wasm_binary_unwrap(),
 				get_account_id_from_seed::<sr25519::Public>("Alice"),
 				vec![
 					get_account_id_from_seed::<sr25519::Public>("Alice"),
