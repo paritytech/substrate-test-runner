@@ -62,7 +62,7 @@ fn should_read_state() {
 	let mut test = test::deterministic(node);
 	type Balances = pallet_balances::Module<Runtime>;
 
-	test.produce_blocks(1);
+	test.produce_blocks(2);
 
 	let alice = Sr25519Keyring::Alice.pair();
 	let bob = Sr25519Keyring::Bob.pair();
@@ -76,7 +76,6 @@ fn should_read_state() {
 		.with_filter(vec![alice.public().into()]);
 
 	let (bob_balance, alice_balance) = test.with_state(|| {
-		let events = frame_system::Module::<Runtime>::events();
 		(
 			Balances::free_balance(MultiSigner::from(bob_public).into_account()),
 			Balances::free_balance(MultiSigner::from(alice_public).into_account()),
@@ -94,8 +93,6 @@ fn should_read_state() {
 	test.produce_blocks(1);
 
 	let (new_bob_balance, new_alice_balance) = test.with_state(|| {
-		let events = frame_system::Module::<Runtime>::events();
-		log::info!("{:#?}", events);
 		(
 			Balances::free_balance(MultiSigner::from(bob_public).into_account()),
 			Balances::free_balance(MultiSigner::from(alice_public).into_account()),
