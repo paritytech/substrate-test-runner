@@ -32,7 +32,7 @@ impl<N> BlackBox<N>
 	
 	/// Wait `number` of blocks.
 	pub fn wait_blocks(&self, _number: impl Into<types::BlockNumber<N::Runtime>>) {
-		todo!()
+		// no-op
 	}
 }
 
@@ -43,7 +43,7 @@ impl<N> rpc::RpcExtension for BlackBox<N> {
 			BlackBoxNode::Internal(ref mut node) => {
 				use futures01::Future;
 				let (client, fut) = local::connect::<TClient, _, _>(node.rpc_handler());
-				node.tokio_runtime().spawn(fut.map_err(|_| ()));
+				node.compat_runtime().spawn(fut.map_err(|_| ()));
 
 				client
 			}

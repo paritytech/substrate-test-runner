@@ -26,18 +26,21 @@ impl TestRuntimeRequirements for Node {
 	type Executor = node_executor::Executor;
 	type Runtime = node_runtime::Runtime;
 	type RuntimeApi = node_runtime::RuntimeApi;
+
+	fn load_spec(_: String) -> Result<Box<dyn sc_service::ChainSpec>, String> {
+		Ok(Box::new(node_cli::chain_spec::development_config()))
+	}
 }
 
 #[test]
 fn should_run_off_chain_worker() {
-	let node = InternalNode::<Node>::new(spec_factory).unwrap();
-
+	let node = InternalNode::<Node>::new().unwrap();
 	let mut test = test::deterministic(node);
-	let mut runtime = tokio_compat::runtime::Runtime::new().unwrap();
-	runtime.block_on_std(async {
-		let chain_client = test.rpc::<rpc::ChainClient<Runtime>>();
-		let rpc_client = test.raw_rpc();
 
+	let chain_client = test.rpc::<rpc::ChainClient<Runtime>>();
+	let rpc_client = test.raw_rpc();
+	
+	test.compat_runtime().block_on_std(async {
 		// TODO [ToDr] This should be even rawer - allowing to pass JSON call,
 		// which in turn could be collected from the UI.
 		let header = rpc_client
@@ -48,21 +51,23 @@ fn should_run_off_chain_worker() {
 
 		let header = chain_client.header(None).compat().await.unwrap();
 		println!("{:?}", header);
-
-		test.produce_blocks(15);
-
-		test.assert_log_line("db", "best = true");
 	});
+
+
+	test.produce_blocks(15);
+
+	test.assert_log_line("best = true");
 }
 
 #[test]
 fn should_read_state() {
 	// given
-	let node = InternalNode::<Node>::new(spec_factory).unwrap();
+	let node = InternalNode::<Node>::new().unwrap();
 	let mut test = test::deterministic(node);
+	
 	type Balances = pallet_balances::Module<Runtime>;
 
-	test.produce_blocks(2);
+	test.produce_blocks(3);
 
 	let alice = Sr25519Keyring::Alice.pair();
 	let bob = Sr25519Keyring::Bob.pair();

@@ -1,52 +1,49 @@
 use std::io::Write;
-use std::sync::Arc;
 use std::marker::PhantomData;
+use std::sync::Arc;
+use std::fmt;
 
-use futures::FutureExt;
+use crate::chain_spec::ChainSpecFactory;
+use futures::{channel::mpsc, FutureExt, Sink, SinkExt};
 use jsonrpc_core::MetaIoHandler;
-use jsonrpc_core_client::{RpcChannel, transports::local};
-use parking_lot::RwLock;
+use jsonrpc_core_client::{transports::local, RpcChannel};
+use manual_seal::{consensus::babe::BabeConsensusDataProvider, run_manual_seal, ManualSealParams};
 use sc_cli::build_runtime;
 use sc_client_api::{backend::Backend, execution_extensions::ExecutionStrategies};
 use sc_executor::NativeExecutionDispatch;
 use sc_informant::OutputFormat;
 use sc_network::{config::TransportConfig, multiaddr};
 use sc_service::{
-	BasePath, build_network, BuildNetworkParams, Configuration, DatabaseConfig, new_full_parts,
-	Role, spawn_tasks, SpawnTasksParams, TaskExecutor, TaskManager, TaskType, TFullBackend, TFullClient,
+	build_network,
 	config::{KeystoreConfig, NetworkConfiguration, WasmExecutionMethod},
+	new_full_parts, spawn_tasks, BasePath, BuildNetworkParams, ChainSpec, Configuration, DatabaseConfig, Role,
+	SpawnTasksParams, TFullBackend, TFullClient, TaskExecutor, TaskManager, TaskType,
 };
 use sc_transaction_pool::BasicPool;
-use sp_api::{ApiErrorExt, ApiExt, ConstructRuntimeApi, Core, Metadata, ProvideRuntimeApi};
+use sp_api::{ApiErrorExt, ApiExt, ConstructRuntimeApi, Core, Metadata};
 use sp_block_builder::BlockBuilder;
+use sp_consensus_babe::BabeApi;
 use sp_inherents::InherentDataProviders;
 use sp_keyring::Sr25519Keyring;
 use sp_offchain::OffchainWorkerApi;
 use sp_runtime::traits::{Block as BlockT, NumberFor};
 use sp_session::SessionKeys;
 use sp_transaction_pool::runtime_api::TaggedTransactionQueue;
-use manual_seal::{
-	run_manual_seal, ManualSealParams,
-	consensus::{ConsensusDataProvider, babe::BabeConsensusDataProvider},
-};
-use sp_consensus_babe::BabeApi;
-use crate::chain_spec::ChainSpecFactory;
-use sp_runtime::generic::BlockId;
 
 type Module = String;
-type Logger = Arc<RwLock<std::collections::HashMap<Module, Vec<String>>>>;
 
 /// This holds a reference to a running node on another thread,
 /// the node process is dropped when this struct is dropped
 /// also holds logs from the process.
 pub struct InternalNode<Node> {
-	logger: Logger,
-
 	/// rpc handler for communicating with the node over rpc.
 	rpc_handlers: Arc<MetaIoHandler<sc_rpc::Metadata>>,
 
 	/// tokio-compat runtime
 	compat_runtime: tokio_compat::runtime::Runtime,
+
+	///Stream of log lines
+	log_stream: futures::channel::mpsc::UnboundedReceiver<String>,
 
 	/// node tokio runtime
 	_runtime: tokio::runtime::Runtime,
@@ -59,29 +56,33 @@ pub struct InternalNode<Node> {
 
 impl<Node> InternalNode<Node> {
 	/// Starts a node with the manual-seal authorship,
-	pub fn new<SpecFactory>(
-		spec_factory: SpecFactory,
-	) -> Result<Self, sc_service::Error>
-		where
-			Node: TestRuntimeRequirements,
+	pub fn new() -> Result<Self, sc_service::Error>
+	where
+		Node: TestRuntimeRequirements,
 			<Node::RuntimeApi as
-				ConstructRuntimeApi<Node::OpaqueBlock, TFullClient<Node::OpaqueBlock, Node::RuntimeApi, Node::Executor>>
-			>::RuntimeApi:
-				Core<Node::OpaqueBlock> + Metadata<Node::OpaqueBlock> + OffchainWorkerApi<Node::OpaqueBlock>
-				+ SessionKeys<Node::OpaqueBlock> + TaggedTransactionQueue<Node::OpaqueBlock>
-				+ BlockBuilder<Node::OpaqueBlock> + ApiErrorExt<Error=sp_blockchain::Error>
+				ConstructRuntimeApi<
+					Node::OpaqueBlock,
+					TFullClient<Node::OpaqueBlock, Node::RuntimeApi, Node::Executor>
+				>
+			>::RuntimeApi: Core<Node::OpaqueBlock> + Metadata<Node::OpaqueBlock>
+				+ OffchainWorkerApi<Node::OpaqueBlock> + SessionKeys<Node::OpaqueBlock>
+				+ TaggedTransactionQueue<Node::OpaqueBlock> + BlockBuilder<Node::OpaqueBlock>
+				+ ApiErrorExt<Error=sp_blockchain::Error>
 				+ BabeApi<Node::OpaqueBlock, Error = sp_blockchain::Error>
 				+ ApiExt<
 					Node::OpaqueBlock,
-					StateBackend= <TFullBackend<Node::OpaqueBlock> as Backend<Node::OpaqueBlock>>::State
-				>,
-			NumberFor<Node::OpaqueBlock>: finality_grandpa::BlockNumberOps,
-			SpecFactory: ChainSpecFactory,
+					StateBackend =
+						<TFullBackend<Node::OpaqueBlock> as Backend<Node::OpaqueBlock>>::State,
+					>,
+		NumberFor<Node::OpaqueBlock>: finality_grandpa::BlockNumberOps,
 	{
-		let logger = build_logger();
-
 		let compat_runtime = tokio_compat::runtime::Runtime::new().unwrap();
 		let tokio_runtime = build_runtime().unwrap();
+
+		// unbounded logs, should be fine, test is shortlived.
+		let (log_sink, log_stream) = futures::channel::mpsc::unbounded();
+
+		let logger = build_logger(tokio_runtime.handle().clone(), log_sink);
 		let runtime_handle = tokio_runtime.handle().clone();
 
 		let task_executor = move |fut, task_type| match task_type {
@@ -91,29 +92,23 @@ impl<Node> InternalNode<Node> {
 				.map(drop),
 		};
 
-		let config = build_config(spec_factory, task_executor.into());
+		let config = build_config::<Node>(task_executor.into());
 
 		let (client, backend, keystore, mut task_manager) =
 			new_full_parts::<Node::OpaqueBlock, Node::RuntimeApi, Node::Executor>(&config)?;
 		let client = Arc::new(client);
 		let select_chain = sc_consensus::LongestChain::new(backend.clone());
 
-		let (grandpa_block_import, ..) = sc_finality_grandpa::block_import(
-			client.clone(),
-			&(client.clone() as Arc<_>),
-			select_chain.clone(),
-		)?;
+		let (grandpa_block_import, ..) =
+			sc_finality_grandpa::block_import(client.clone(), &(client.clone() as Arc<_>), select_chain.clone())?;
 
 		let (block_import, babe_link) = sc_consensus_babe::block_import(
 			sc_consensus_babe::Config::get_or_compute(&*client)?,
 			grandpa_block_import,
 			client.clone(),
 		)?;
-		let import_queue = manual_seal::import_queue(
-			Box::new(block_import.clone()),
-			&task_manager.spawn_handle(),
-			None
-		);
+		let import_queue =
+			manual_seal::import_queue(Box::new(block_import.clone()), &task_manager.spawn_handle(), None);
 
 		let transaction_pool = BasicPool::new_full(
 			config.transaction_pool.clone(),
@@ -186,7 +181,8 @@ impl<Node> InternalNode<Node> {
 			keystore,
 			&inherent_data_providers,
 			babe_link.epoch_changes().clone(),
-		).expect("failed to create DigestProvider");
+		)
+		.expect("failed to create DigestProvider");
 
 		// Background authorship future.
 		let authorship_future = run_manual_seal(ManualSealParams {
@@ -213,7 +209,7 @@ impl<Node> InternalNode<Node> {
 			_phantom: PhantomData,
 			_runtime: tokio_runtime,
 			compat_runtime,
-			logger,
+			log_stream,
 		})
 	}
 
@@ -224,8 +220,8 @@ impl<Node> InternalNode<Node> {
 
 	/// create a new jsonrpc client using the jsonrpc-core-client local transport
 	pub fn rpc_client<C>(&self) -> C
-		where
-			C: From<RpcChannel> + 'static,
+	where
+		C: From<RpcChannel> + 'static,
 	{
 		use futures01::Future;
 		let rpc_handler = self.rpc_handlers.clone();
@@ -235,12 +231,17 @@ impl<Node> InternalNode<Node> {
 	}
 
 	/// provides access to the tokio compat runtime.
-	pub fn tokio_runtime(&mut self) -> &mut tokio_compat::runtime::Runtime {
+	pub fn compat_runtime(&mut self) -> &mut tokio_compat::runtime::Runtime {
 		&mut self.compat_runtime
 	}
 
-	pub(crate) fn logs(&self) -> &Logger {
-		&self.logger
+	/// provides access to the tokio runtime.
+	pub fn tokio_runtime(&mut self) -> &mut tokio::runtime::Runtime {
+		&mut self._runtime
+	}
+
+	pub(crate) fn log_stream(&mut self) -> &mut mpsc::UnboundedReceiver<String> {
+		&mut self.log_stream
 	}
 }
 
@@ -253,24 +254,31 @@ impl<Node> Drop for InternalNode<Node> {
 	}
 }
 
-
 /// Wrapper trait for concrete type required by this testing framework.
 pub trait TestRuntimeRequirements {
 	/// Opaque block type
 	type OpaqueBlock: BlockT;
+
 	/// Executor type
 	type Executor: NativeExecutionDispatch + 'static;
+
 	/// Runtime
 	type Runtime: frame_system::Trait;
+
 	/// RuntimeApi
-	type RuntimeApi: Send + Sync + 'static
+	type RuntimeApi: Send
+		+ Sync
+		+ 'static
 		+ ConstructRuntimeApi<Self::OpaqueBlock, TFullClient<Self::OpaqueBlock, Self::RuntimeApi, Self::Executor>>;
+
+	/// chain spec factory
+	fn load_spec(id: String) -> Result<Box<dyn ChainSpec>, String>;
 }
 
 /// Used to create `Configuration` object for the node.
-fn build_config<SpecFactory>(spec_factory: SpecFactory, task_executor: TaskExecutor) -> Configuration
-	where
-		SpecFactory: ChainSpecFactory
+fn build_config<Node>(task_executor: TaskExecutor) -> Configuration
+where
+	Node: TestRuntimeRequirements,
 {
 	let base_path = BasePath::new_temp_dir().expect("could not create temporary directory");
 	let root = base_path.path();
@@ -278,9 +286,7 @@ fn build_config<SpecFactory>(spec_factory: SpecFactory, task_executor: TaskExecu
 		sentry_nodes: Vec::new(),
 	};
 	let key_seed = Sr25519Keyring::Alice.to_seed();
-	let mut chain_spec = spec_factory
-		.load_spec("dev".into())
-		.expect("failed to load chain specification");
+	let mut chain_spec = Node::load_spec("dev".into()).expect("failed to load chain specification");
 	let storage = chain_spec
 		.as_storage_builder()
 		.build_storage()
@@ -359,7 +365,11 @@ fn build_config<SpecFactory>(spec_factory: SpecFactory, task_executor: TaskExecu
 }
 
 /// Builds the global logger.
-fn build_logger() -> Logger {
+fn build_logger<LogSink>(executor: tokio::runtime::Handle, log_sink: LogSink)
+	where
+		LogSink: Sink<String> + Clone + Unpin + Send + Sync + 'static,
+		LogSink::Error: Send + Sync + fmt::Debug,
+{
 	let ignore = [
 		"yamux",
 		"multistream_select",
@@ -372,27 +382,28 @@ fn build_logger() -> Logger {
 		"peerset",
 		"ws",
 		"sc_network",
-		"sc_service",
+		// "sc_service",
 		"sc_peerset",
 		"rpc",
 	];
-	let logs = Logger::default();
-	{
-		let logs = logs.clone();
-		let mut builder = env_logger::builder();
-		builder.format(move |buf: &mut env_logger::fmt::Formatter, record: &log::Record| {
-			let entry = format!("{} {} {}", record.level(), record.target(), record.args());
-			let res = writeln!(buf, "{}", entry);
-			logs.write().entry(record.target().to_string()).or_default().push(entry);
-			res
+	let mut builder = env_logger::builder();
+	builder.format(move |buf: &mut env_logger::fmt::Formatter, record: &log::Record| {
+		let entry = format!("{} {} {}", record.level(), record.target(), record.args());
+		let res = writeln!(buf, "{}", entry);
+		
+		let mut log_sink_clone = log_sink.clone();
+		let _ = executor.spawn(async move {
+			log_sink_clone.send(entry).await
+				.expect("log_stream is dropped");
 		});
-		builder.write_style(env_logger::WriteStyle::Always);
-		builder.filter_level(log::LevelFilter::Debug);
-		builder.filter_module("runtime", log::LevelFilter::Trace);
-		for module in &ignore {
-			builder.filter_module(module, log::LevelFilter::Info);
-		}
-		let _ = builder.is_test(true).try_init();
+		res
+	});
+	builder.write_style(env_logger::WriteStyle::Always);
+	builder.filter_level(log::LevelFilter::Debug);
+	builder.filter_module("runtime", log::LevelFilter::Trace);
+	builder.filter_module("sc_service", log::LevelFilter::Trace);
+	for module in &ignore {
+		builder.filter_module(module, log::LevelFilter::Info);
 	}
-	logs
+	let _ = builder.is_test(true).try_init();
 }

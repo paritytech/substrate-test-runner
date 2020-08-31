@@ -1,3 +1,4 @@
+use crate::node::TestRuntimeRequirements;
 use crate::test::externalities::{TestExternalities, TxPoolExtApi};
 use crate::{
 	node::InternalNode,
@@ -12,9 +13,8 @@ use sp_core::{
 };
 use sp_externalities::{Externalities, ExternalitiesExt};
 use sp_keyring::sr25519::Keyring;
-use std::ops::{Deref, DerefMut};
-use crate::node::TestRuntimeRequirements;
 use sp_runtime::traits::Block as BlockT;
+use std::ops::{Deref, DerefMut};
 
 /// A deterministic internal instance of substrate node.
 pub struct Deterministic<Node: TestRuntimeRequirements> {
@@ -56,17 +56,19 @@ impl<Node: TestRuntimeRequirements + 'static> Deterministic<Node> {
 }
 
 impl<Node: TestRuntimeRequirements> Deterministic<Node> {
-	pub fn assert_log_line(&self, module: &str, content: &str) {
-		if let Some(logs) = self.node.logs().read().get(module) {
-			for log in logs {
-				if log.contains(content) {
+	pub fn assert_log_line(&mut self, content: &str) {
+		futures::executor::block_on(async {
+			use futures::StreamExt;
+
+			while let Some(log_line) = self.node.log_stream().next().await {
+				if log_line.contains(content) {
 					return;
 				}
 			}
-			panic!("Could not find {} in logs: {:?}", content, logs)
-		} else {
-			panic!("No logs from {} module.", module);
-		}
+
+			panic!("Could not find {} in logs content", content);
+
+		});
 	}
 
 	pub fn produce_blocks(&mut self, num: usize) {
@@ -74,10 +76,11 @@ impl<Node: TestRuntimeRequirements> Deterministic<Node> {
 
 		for _ in 0..num {
 			self.node
-				.tokio_runtime()
+				.compat_runtime()
 				.block_on(client.create_block(true, false, None))
 				.expect("block production failed: ");
 		}
+
 		log::info!("sealed {} blocks", num)
 	}
 

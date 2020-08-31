@@ -2,7 +2,7 @@ use crate::rpc;
 use futures01::Future;
 use sp_core::offchain::TransactionPool;
 use sp_externalities::Extensions;
-use sp_storage::{ChildInfo, StorageKey};
+use sp_storage::{ChildInfo, StorageKey, TrackedStorageKey};
 use std::any::{Any, TypeId};
 use crate::node::TestRuntimeRequirements;
 
@@ -170,7 +170,11 @@ impl<Node: TestRuntimeRequirements> sp_externalities::Externalities for TestExte
 		unimplemented!("reset_read_write_count")
 	}
 
-	fn set_whitelist(&mut self, _: Vec<Vec<u8>>) {
+	fn set_whitelist(&mut self, _: Vec<TrackedStorageKey>) {
 		unimplemented!("set_whitelist")
+	}
+
+	fn get_whitelist(&self) -> Vec<TrackedStorageKey> {
+		unimplemented!("get_whitelist")
 	}
 }
