@@ -67,7 +67,6 @@ impl<Node: TestRuntimeRequirements> Deterministic<Node> {
 			}
 
 			panic!("Could not find {} in logs content", content);
-
 		});
 	}
 

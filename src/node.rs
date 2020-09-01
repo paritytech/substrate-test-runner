@@ -3,7 +3,6 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 use std::fmt;
 
-use crate::chain_spec::ChainSpecFactory;
 use futures::{channel::mpsc, FutureExt, Sink, SinkExt};
 use jsonrpc_core::MetaIoHandler;
 use jsonrpc_core_client::{transports::local, RpcChannel};
@@ -30,7 +29,6 @@ use sp_runtime::traits::{Block as BlockT, NumberFor};
 use sp_session::SessionKeys;
 use sp_transaction_pool::runtime_api::TaggedTransactionQueue;
 
-type Module = String;
 
 /// This holds a reference to a running node on another thread,
 /// the node process is dropped when this struct is dropped
@@ -57,8 +55,8 @@ pub struct InternalNode<Node> {
 impl<Node> InternalNode<Node> {
 	/// Starts a node with the manual-seal authorship,
 	pub fn new() -> Result<Self, sc_service::Error>
-	where
-		Node: TestRuntimeRequirements,
+		where
+			Node: TestRuntimeRequirements,
 			<Node::RuntimeApi as
 				ConstructRuntimeApi<
 					Node::OpaqueBlock,
@@ -74,7 +72,7 @@ impl<Node> InternalNode<Node> {
 					StateBackend =
 						<TFullBackend<Node::OpaqueBlock> as Backend<Node::OpaqueBlock>>::State,
 					>,
-		NumberFor<Node::OpaqueBlock>: finality_grandpa::BlockNumberOps,
+			NumberFor<Node::OpaqueBlock>: finality_grandpa::BlockNumberOps,
 	{
 		let compat_runtime = tokio_compat::runtime::Runtime::new().unwrap();
 		let tokio_runtime = build_runtime().unwrap();
@@ -82,7 +80,7 @@ impl<Node> InternalNode<Node> {
 		// unbounded logs, should be fine, test is shortlived.
 		let (log_sink, log_stream) = futures::channel::mpsc::unbounded();
 
-		let logger = build_logger(tokio_runtime.handle().clone(), log_sink);
+		build_logger(tokio_runtime.handle().clone(), log_sink);
 		let runtime_handle = tokio_runtime.handle().clone();
 
 		let task_executor = move |fut, task_type| match task_type {
@@ -172,11 +170,8 @@ impl<Node> InternalNode<Node> {
 		};
 
 		let inherent_data_providers = InherentDataProviders::new();
-		inherent_data_providers
-			.register_provider(sp_timestamp::InherentDataProvider)
-			.expect("failed to register timestamp inherent");
 
-		let digest_provider = BabeConsensusDataProvider::new(
+		let consensus_data_provider = BabeConsensusDataProvider::new(
 			client.clone(),
 			keystore,
 			&inherent_data_providers,
@@ -192,7 +187,7 @@ impl<Node> InternalNode<Node> {
 			pool: transaction_pool.pool().clone(),
 			commands_stream,
 			select_chain,
-			digest_provider: Some(Box::new(digest_provider)),
+			consensus_data_provider: Some(Box::new(consensus_data_provider)),
 			inherent_data_providers,
 		});
 
@@ -272,7 +267,7 @@ pub trait TestRuntimeRequirements {
 		+ ConstructRuntimeApi<Self::OpaqueBlock, TFullClient<Self::OpaqueBlock, Self::RuntimeApi, Self::Executor>>;
 
 	/// chain spec factory
-	fn load_spec(id: String) -> Result<Box<dyn ChainSpec>, String>;
+	fn load_spec() -> Result<Box<dyn ChainSpec>, String>;
 }
 
 /// Used to create `Configuration` object for the node.
@@ -286,7 +281,7 @@ where
 		sentry_nodes: Vec::new(),
 	};
 	let key_seed = Sr25519Keyring::Alice.to_seed();
-	let mut chain_spec = Node::load_spec("dev".into()).expect("failed to load chain specification");
+	let mut chain_spec = Node::load_spec().expect("failed to load chain specification");
 	let storage = chain_spec
 		.as_storage_builder()
 		.build_storage()
@@ -382,7 +377,7 @@ fn build_logger<LogSink>(executor: tokio::runtime::Handle, log_sink: LogSink)
 		"peerset",
 		"ws",
 		"sc_network",
-		// "sc_service",
+		"sc_service",
 		"sc_peerset",
 		"rpc",
 	];

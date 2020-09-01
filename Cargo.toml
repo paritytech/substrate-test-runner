@@ -10,9 +10,6 @@ members = [
     "runtime"
 ]
 
-[build-dependencies]
-substrate-build-script-utils = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-
 [dependencies]
 # client deps
 sc-executor = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
@@ -26,7 +23,6 @@ sc-rpc = { git = "https://github.com/paritytech/substrate.git", branch = "seun-b
 sc-consensus = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 sc-finality-grandpa = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 sc-consensus-babe = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-
 sc-transaction-pool = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 sc-client-db = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 sc-client-api = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
@@ -62,7 +58,6 @@ log = "0.4.8"
 hyper = "0.12.35"
 serde_json = "1.0"
 derive_more = "0.99.9"
-jsonrpsee = "0.1.0"
 futures01 = { package = "futures", version = "0.1.29" }
 futures = { package = "futures", version = "0.3", features = ["compat"] }
 rand = "0.7"

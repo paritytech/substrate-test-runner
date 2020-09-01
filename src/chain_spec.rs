@@ -1,5 +1,5 @@
 use runtime::{
-	AccountId, Signature, WASM_BINARY,
+	AccountId, Signature,
 	BalancesConfig, GenesisConfig, IndicesConfig, SudoConfig, SystemConfig,
 };
 use sc_service::ChainType;
@@ -9,21 +9,6 @@ use sp_runtime::traits::{IdentifyAccount, Verify};
 /// Specialized `ChainSpec`. This is a specialization of the general Substrate ChainSpec type.
 pub type ChainSpec = sc_service::GenericChainSpec<GenesisConfig>;
 
-/// Chain spec factory, allows for creating different chain specs, given different
-/// chain_id's.
-pub trait ChainSpecFactory {
-	/// produces a chain spec given a valid chain_id.
-	fn load_spec(&self, id: String) -> Result<Box<dyn sc_service::ChainSpec>, String>;
-}
-
-impl<F> ChainSpecFactory for F
-	where
-		F: Fn(String) -> Result<Box<dyn sc_service::ChainSpec>, String>
-{
-	fn load_spec(&self, id: String) -> Result<Box<dyn sc_service::ChainSpec>, String> {
-		(self)(id)
-	}
-}
 
 /// Generate a crypto pair from seed.
 pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Public {
@@ -35,8 +20,8 @@ pub fn get_from_seed<TPublic: Public>(seed: &str) -> <TPublic::Pair as Pair>::Pu
 type AccountPublic = <Signature as Verify>::Signer;
 
 pub fn spec_factory(_: String) -> Result<Box<dyn sc_service::ChainSpec>, String> {
-	// we supply our own chainspec
-	Ok(Box::new(node_cli::chain_spec::development_config()))
+	// we supply our own chain spec
+	Ok(Box::new(development_config()?))
 }
 
 /// Generate an account ID from seed.

@@ -7,7 +7,6 @@ use sp_keyring::Sr25519Keyring;
 use sp_runtime::{traits::IdentifyAccount, MultiSigner};
 use substrate_test_runner::{
 	prelude::*, rpc, test, node::{InternalNode, TestRuntimeRequirements},
-	chain_spec::spec_factory,
 };
 use sc_executor::native_executor_instance;
 
@@ -27,7 +26,7 @@ impl TestRuntimeRequirements for Node {
 	type Runtime = node_runtime::Runtime;
 	type RuntimeApi = node_runtime::RuntimeApi;
 
-	fn load_spec(_: String) -> Result<Box<dyn sc_service::ChainSpec>, String> {
+	fn load_spec() -> Result<Box<dyn sc_service::ChainSpec>, String> {
 		Ok(Box::new(node_cli::chain_spec::development_config()))
 	}
 }
@@ -67,24 +66,18 @@ fn should_read_state() {
 	
 	type Balances = pallet_balances::Module<Runtime>;
 
-	test.produce_blocks(3);
+	test.produce_blocks(1);
 
 	let alice = Sr25519Keyring::Alice.pair();
 	let bob = Sr25519Keyring::Bob.pair();
-	let (alice_public, bob_public) = (
-		alice.public(),
-		bob.public(),
-	);
+	let bob_public = bob.public();
 
 	let signer = Signer::<node_runtime::Runtime, RuntimeKeyType>::all_accounts()
 		// only use alice' account for signing
 		.with_filter(vec![alice.public().into()]);
 
-	let (bob_balance, alice_balance) = test.with_state(|| {
-		(
-			Balances::free_balance(MultiSigner::from(bob_public).into_account()),
-			Balances::free_balance(MultiSigner::from(alice_public).into_account()),
-		)
+	let bob_balance = test.with_state(|| {
+		Balances::free_balance(MultiSigner::from(bob_public).into_account())
 	});
 
 	let mut result = test.with_state(|| {
@@ -97,23 +90,9 @@ fn should_read_state() {
 
 	test.produce_blocks(1);
 
-	let (new_bob_balance, new_alice_balance) = test.with_state(|| {
-		(
-			Balances::free_balance(MultiSigner::from(bob_public).into_account()),
-			Balances::free_balance(MultiSigner::from(alice_public).into_account()),
-		)
+	let new_bob_balance = test.with_state(|| {
+		Balances::free_balance(MultiSigner::from(bob_public).into_account())
 	});
-
-	// FIXME: alice' balance doesnt change lmao
-	log::info!(
-		"\n\n{:#?}: before {}, after {}\n\n{:#?}: before {}, after {}\n\n",
-		MultiSigner::from(bob_public),
-		bob_balance,
-		new_bob_balance,
-		MultiSigner::from(alice_public),
-		alice_balance,
-		new_alice_balance
-	);
 
 	assert_eq!((new_bob_balance - bob_balance), 8900000000000000);
 }
