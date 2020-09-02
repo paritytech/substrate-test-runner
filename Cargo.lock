@@ -6935,20 +6935,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sp-consensus-aura"
-version = "0.8.0-rc6"
-source = "git+https://github.com/paritytech/substrate.git?branch=seun-babe-manual-seal#69a24e276c6f5ee62a9d55ad05ffaf31f69f23cd"
-dependencies = [
- "parity-scale-codec",
- "sp-api",
- "sp-application-crypto",
- "sp-inherents",
- "sp-runtime",
- "sp-std",
- "sp-timestamp",
-]
-
-[[package]]
 name = "sp-consensus-babe"
 version = "0.8.0-rc6"
 source = "git+https://github.com/paritytech/substrate.git?branch=seun-babe-manual-seal#69a24e276c6f5ee62a9d55ad05ffaf31f69f23cd"
@@ -7623,8 +7609,10 @@ dependencies = [
  "sc-transaction-pool",
  "serde_json",
  "sp-api",
+ "sp-application-crypto",
  "sp-block-builder",
  "sp-blockchain",
+ "sp-consensus",
  "sp-consensus-babe",
  "sp-core",
  "sp-externalities",
@@ -7637,7 +7625,6 @@ dependencies = [
  "sp-timestamp",
  "sp-transaction-pool",
  "structopt",
- "test-runtime",
  "tokio 0.2.22",
  "tokio-compat",
  "url 1.7.2",
@@ -7716,37 +7703,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bb6bfa289a4d7c5766392812c0a1f4c1ba45afa1ad47803c11e1f407d846d75f"
 dependencies = [
  "winapi-util",
-]
-
-[[package]]
-name = "test-runtime"
-version = "0.0.1"
-dependencies = [
- "frame-executive",
- "frame-support",
- "frame-system",
- "pallet-balances",
- "pallet-indices",
- "pallet-randomness-collective-flip",
- "pallet-sudo",
- "pallet-timestamp",
- "pallet-transaction-payment",
- "parity-scale-codec",
- "serde",
- "sp-api",
- "sp-application-crypto",
- "sp-block-builder",
- "sp-consensus-aura",
- "sp-core",
- "sp-inherents",
- "sp-io",
- "sp-offchain",
- "sp-runtime",
- "sp-session",
- "sp-std",
- "sp-transaction-pool",
- "sp-version",
- "substrate-wasm-builder-runner",
 ]
 
 [[package]]

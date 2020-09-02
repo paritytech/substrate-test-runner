@@ -71,7 +71,7 @@ impl<Node: TestRuntimeRequirements> Deterministic<Node> {
 	}
 
 	pub fn produce_blocks(&mut self, num: usize) {
-		let client = self.rpc::<ManualSealClient<<Node::OpaqueBlock as BlockT>::Hash>>();
+		let client = self.rpc::<ManualSealClient<<Node::Block as BlockT>::Hash>>();
 
 		for _ in 0..num {
 			self.node

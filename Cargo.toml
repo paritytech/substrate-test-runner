@@ -3,12 +3,6 @@ name = "substrate-test-runner"
 version = "0.1.0"
 authors = ["Tomasz Drwięga <tomusdrw@gmail.com>"]
 edition = "2018"
-build = "build.rs"
-
-[workspace]
-members = [
-    "runtime"
-]
 
 [dependencies]
 # client deps
@@ -33,8 +27,10 @@ sp-core = { git = "https://github.com/paritytech/substrate.git", branch = "seun-
 sp-blockchain = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 sp-block-builder = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 sp-api = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-application-crypto = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 sp-transaction-pool = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 sp-consensus-babe = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-consensus = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 sc-keystore = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 sp-runtime = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 sp-session = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
@@ -72,7 +68,6 @@ tokio-compat = { version = "0.1.6", features = ["rt-full"] }
 url = "1.7"
 primitive-types = "0.7"
 
-runtime = { package = "test-runtime", path = "./runtime" }
 node-runtime = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 node-cli = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 

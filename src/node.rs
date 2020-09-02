@@ -6,7 +6,9 @@ use std::fmt;
 use futures::{channel::mpsc, FutureExt, Sink, SinkExt};
 use jsonrpc_core::MetaIoHandler;
 use jsonrpc_core_client::{transports::local, RpcChannel};
-use manual_seal::{consensus::babe::BabeConsensusDataProvider, run_manual_seal, ManualSealParams};
+use manual_seal::{
+	run_manual_seal, ManualSealParams, consensus::ConsensusDataProvider,
+};
 use sc_cli::build_runtime;
 use sc_client_api::{backend::Backend, execution_extensions::ExecutionStrategies};
 use sc_executor::NativeExecutionDispatch;
@@ -15,20 +17,20 @@ use sc_network::{config::TransportConfig, multiaddr};
 use sc_service::{
 	build_network,
 	config::{KeystoreConfig, NetworkConfiguration, WasmExecutionMethod},
-	new_full_parts, spawn_tasks, BasePath, BuildNetworkParams, ChainSpec, Configuration, DatabaseConfig, Role,
+	spawn_tasks, BasePath, BuildNetworkParams, ChainSpec, Configuration, DatabaseConfig, Role,
 	SpawnTasksParams, TFullBackend, TFullClient, TaskExecutor, TaskManager, TaskType,
 };
 use sc_transaction_pool::BasicPool;
-use sp_api::{ApiErrorExt, ApiExt, ConstructRuntimeApi, Core, Metadata};
+use sp_api::{ApiErrorExt, ApiExt, ConstructRuntimeApi, Core, Metadata, TransactionFor};
 use sp_block_builder::BlockBuilder;
-use sp_consensus_babe::BabeApi;
 use sp_inherents::InherentDataProviders;
 use sp_keyring::Sr25519Keyring;
 use sp_offchain::OffchainWorkerApi;
-use sp_runtime::traits::{Block as BlockT, NumberFor};
+use sp_runtime::traits::Block as BlockT;
 use sp_session::SessionKeys;
 use sp_transaction_pool::runtime_api::TaggedTransactionQueue;
-
+use sc_keystore::KeyStorePtr;
+use sp_consensus::{BlockImport, SelectChain};
 
 /// This holds a reference to a running node on another thread,
 /// the node process is dropped when this struct is dropped
@@ -59,20 +61,18 @@ impl<Node> InternalNode<Node> {
 			Node: TestRuntimeRequirements,
 			<Node::RuntimeApi as
 				ConstructRuntimeApi<
-					Node::OpaqueBlock,
-					TFullClient<Node::OpaqueBlock, Node::RuntimeApi, Node::Executor>
+					Node::Block,
+					TFullClient<Node::Block, Node::RuntimeApi, Node::Executor>
 				>
-			>::RuntimeApi: Core<Node::OpaqueBlock> + Metadata<Node::OpaqueBlock>
-				+ OffchainWorkerApi<Node::OpaqueBlock> + SessionKeys<Node::OpaqueBlock>
-				+ TaggedTransactionQueue<Node::OpaqueBlock> + BlockBuilder<Node::OpaqueBlock>
+			>::RuntimeApi: Core<Node::Block> + Metadata<Node::Block>
+				+ OffchainWorkerApi<Node::Block> + SessionKeys<Node::Block>
+				+ TaggedTransactionQueue<Node::Block> + BlockBuilder<Node::Block>
 				+ ApiErrorExt<Error=sp_blockchain::Error>
-				+ BabeApi<Node::OpaqueBlock, Error = sp_blockchain::Error>
 				+ ApiExt<
-					Node::OpaqueBlock,
+					Node::Block,
 					StateBackend =
-						<TFullBackend<Node::OpaqueBlock> as Backend<Node::OpaqueBlock>>::State,
+						<TFullBackend<Node::Block> as Backend<Node::Block>>::State,
 					>,
-			NumberFor<Node::OpaqueBlock>: finality_grandpa::BlockNumberOps,
 	{
 		let compat_runtime = tokio_compat::runtime::Runtime::new().unwrap();
 		let tokio_runtime = build_runtime().unwrap();
@@ -92,19 +92,17 @@ impl<Node> InternalNode<Node> {
 
 		let config = build_config::<Node>(task_executor.into());
 
-		let (client, backend, keystore, mut task_manager) =
-			new_full_parts::<Node::OpaqueBlock, Node::RuntimeApi, Node::Executor>(&config)?;
-		let client = Arc::new(client);
-		let select_chain = sc_consensus::LongestChain::new(backend.clone());
+		let (
+			client,
+			backend,
+			keystore,
+			mut task_manager,
+			inherent_data_providers,
+			consensus_data_provider,
+			select_chain,
+			block_import,
+		) = Node::create_client_parts(&config)?;
 
-		let (grandpa_block_import, ..) =
-			sc_finality_grandpa::block_import(client.clone(), &(client.clone() as Arc<_>), select_chain.clone())?;
-
-		let (block_import, babe_link) = sc_consensus_babe::block_import(
-			sc_consensus_babe::Config::get_or_compute(&*client)?,
-			grandpa_block_import,
-			client.clone(),
-		)?;
 		let import_queue =
 			manual_seal::import_queue(Box::new(block_import.clone()), &task_manager.spawn_handle(), None);
 
@@ -146,7 +144,7 @@ impl<Node> InternalNode<Node> {
 				client: client.clone(),
 				backend: backend.clone(),
 				task_manager: &mut task_manager,
-				keystore: keystore.clone(),
+				keystore,
 				on_demand: None,
 				transaction_pool: transaction_pool.clone(),
 				rpc_extensions_builder: Box::new(move |_, _| {
@@ -155,7 +153,7 @@ impl<Node> InternalNode<Node> {
 					io.extend_with({
 						// We provide the rpc handler with the sending end of the channel to allow the rpc
 						// send EngineCommands to the background block authorship task.
-						let handler = rpc::ManualSeal::<<Node::OpaqueBlock as BlockT>::Hash>::new(command_sink.clone());
+						let handler = rpc::ManualSeal::<<Node::Block as BlockT>::Hash>::new(command_sink.clone());
 						rpc::ManualSealApi::to_delegate(handler)
 					});
 					io
@@ -169,16 +167,6 @@ impl<Node> InternalNode<Node> {
 			spawn_tasks(params)?
 		};
 
-		let inherent_data_providers = InherentDataProviders::new();
-
-		let consensus_data_provider = BabeConsensusDataProvider::new(
-			client.clone(),
-			keystore,
-			&inherent_data_providers,
-			babe_link.epoch_changes().clone(),
-		)
-		.expect("failed to create DigestProvider");
-
 		// Background authorship future.
 		let authorship_future = run_manual_seal(ManualSealParams {
 			block_import,
@@ -187,7 +175,7 @@ impl<Node> InternalNode<Node> {
 			pool: transaction_pool.pool().clone(),
 			commands_stream,
 			select_chain,
-			consensus_data_provider: Some(Box::new(consensus_data_provider)),
+			consensus_data_provider,
 			inherent_data_providers,
 		});
 
@@ -252,7 +240,7 @@ impl<Node> Drop for InternalNode<Node> {
 /// Wrapper trait for concrete type required by this testing framework.
 pub trait TestRuntimeRequirements {
 	/// Opaque block type
-	type OpaqueBlock: BlockT;
+	type Block: BlockT;
 
 	/// Executor type
 	type Executor: NativeExecutionDispatch + 'static;
@@ -264,10 +252,48 @@ pub trait TestRuntimeRequirements {
 	type RuntimeApi: Send
 		+ Sync
 		+ 'static
-		+ ConstructRuntimeApi<Self::OpaqueBlock, TFullClient<Self::OpaqueBlock, Self::RuntimeApi, Self::Executor>>;
+		+ ConstructRuntimeApi<Self::Block, TFullClient<Self::Block, Self::RuntimeApi, Self::Executor>>;
+
+	/// select chain type.
+	type SelectChain: SelectChain<Self::Block> + 'static;
+
+	/// Block import type.
+	type BlockImport: Send + Sync + Clone
+		+ BlockImport<
+			Self::Block,
+			Error = sp_consensus::Error,
+			Transaction = TransactionFor<
+				TFullClient<Self::Block, Self::RuntimeApi, Self::Executor>,
+				Self::Block
+			>
+		> + 'static;
 
 	/// chain spec factory
 	fn load_spec() -> Result<Box<dyn ChainSpec>, String>;
+
+	/// Attempt to create client parts, including blockimport,
+	/// selectchain strategy and consensus data provider.
+	fn create_client_parts(config: &Configuration) -> Result<
+		(
+			Arc<TFullClient<Self::Block, Self::RuntimeApi, Self::Executor>>,
+			Arc<TFullBackend<Self::Block>>,
+			KeyStorePtr,
+			TaskManager,
+			InherentDataProviders,
+			Option<Box<
+				dyn ConsensusDataProvider<
+					Self::Block,
+					Transaction = TransactionFor<
+						TFullClient<Self::Block, Self::RuntimeApi, Self::Executor>,
+						Self::Block
+					>,
+				>
+			>>,
+			Self::SelectChain,
+			Self::BlockImport
+		),
+		sc_service::Error
+	>;
 }
 
 /// Used to create `Configuration` object for the node.
