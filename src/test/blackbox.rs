@@ -7,7 +7,7 @@ use crate::{
 use jsonrpc_core_client::{transports::local, RpcChannel};
 use crate::node::TestRuntimeRequirements;
 
-/// A black box node, either runs a manual seal background node,
+/// A black box node, either runs a background node,
 /// or connects via ws to a running node.
 pub enum BlackBoxNode<N> {
 	/// Connects to an external node.
