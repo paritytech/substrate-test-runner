@@ -10,6 +10,7 @@ pub type ChainClient<T> =
 	sc_rpc_api::chain::ChainClient<types::BlockNumber<T>, types::BlockHash<T>, types::Header<T>, types::SignedBlock<T>>;
 
 pub type StateClient<T> = sc_rpc_api::state::StateClient<types::BlockHash<T>>;
+pub type AuthorClient<T> = sc_rpc_api::author::AuthorClient<types::BlockHash<T>, types::BlockHash<T>>;
 
 pub trait RpcExtension {
 	fn raw_rpc(&mut self) -> RawClient {
