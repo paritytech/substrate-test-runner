@@ -32,7 +32,7 @@ impl<N> BlackBox<N>
 	
 	/// Wait `number` of blocks.
 	pub fn wait_blocks(&self, _number: impl Into<types::BlockNumber<N::Runtime>>) {
-		// no-op
+		// TODO: no-op
 	}
 }
 
