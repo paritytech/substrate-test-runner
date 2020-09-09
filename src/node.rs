@@ -301,11 +301,11 @@ fn build_config<Node>(task_executor: TaskExecutor) -> Configuration
 where
 	Node: TestRuntimeRequirements,
 {
-	let base_path =BasePath::from_project("", "", "polkadot");
+	let base_path =BasePath::from_project("", "", "substrate");
 	let root_path = base_path.path()
 		.to_path_buf()
 		.join("chains")
-		.join("polkadot");
+		.join("flamingfir8");
 	let role = Role::Authority {
 		sentry_nodes: Vec::new(),
 	};
