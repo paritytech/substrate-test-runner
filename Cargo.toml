@@ -69,11 +69,11 @@ url = "1.7"
 primitive-types = "0.7"
 
 [dev-dependencies]
-node-runtime = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-node-executor = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-node-primitives = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+#node-runtime = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+#node-executor = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+#node-primitives = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 #node-cli = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-#polkadot-runtime = { git = "https://github.com/paritytech/polkadot.git", branch = "master" }
-#polkadot-core-primitives = { git = "https://github.com/paritytech/polkadot.git", branch = "master" }
-#polkadot-service = { git = "https://github.com/paritytech/polkadot.git", branch = "master" }
-#polkadot-cli = { git = "https://github.com/paritytech/polkadot.git", branch = "master" }
+polkadot-runtime = { git = "https://github.com/paritytech/polkadot.git", branch = "master" }
+polkadot-core-primitives = { git = "https://github.com/paritytech/polkadot.git", branch = "master" }
+polkadot-service = { git = "https://github.com/paritytech/polkadot.git", branch = "master" }
+polkadot-cli = { git = "https://github.com/paritytech/polkadot.git", branch = "master" }
