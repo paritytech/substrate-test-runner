@@ -301,8 +301,11 @@ fn build_config<Node>(task_executor: TaskExecutor) -> Configuration
 where
 	Node: TestRuntimeRequirements,
 {
-	let base_path = BasePath::new_temp_dir().expect("could not create temporary directory");
-	let root = base_path.path();
+	let base_path =BasePath::from_project("", "", "substrate");
+	let root_path = base_path.path()
+		.to_path_buf()
+		.join("chains")
+		.join("flamingfir8");
 	let role = Role::Authority {
 		sentry_nodes: Vec::new(),
 	};
@@ -342,11 +345,11 @@ where
 		transaction_pool: Default::default(),
 		network: network_config,
 		keystore: KeystoreConfig::Path {
-			path: root.join("key"),
+			path: root_path.join("key"),
 			password: None,
 		},
 		database: DatabaseConfig::RocksDb {
-			path: root.join("db"),
+			path: root_path.join("db"),
 			cache_size: 128,
 		},
 		state_cache_size: 16777216,
