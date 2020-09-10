@@ -2,6 +2,7 @@ use std::io::Write;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::fmt;
+use std::path::PathBuf;
 
 use futures::{channel::mpsc, FutureExt, Sink, SinkExt};
 use jsonrpc_core::MetaIoHandler;
@@ -271,6 +272,11 @@ pub trait TestRuntimeRequirements {
 	/// chain spec factory
 	fn load_spec() -> Result<Box<dyn ChainSpec>, String>;
 
+	/// provide a path to an existing db
+	fn base_path() -> Option<&'static str> {
+		None
+	}
+
 	/// Attempt to create client parts, including blockimport,
 	/// selectchain strategy and consensus data provider.
 	fn create_client_parts(config: &Configuration) -> Result<
@@ -301,16 +307,22 @@ fn build_config<Node>(task_executor: TaskExecutor) -> Configuration
 where
 	Node: TestRuntimeRequirements,
 {
-	let base_path =BasePath::from_project("", "", "substrate");
+	let mut chain_spec = Node::load_spec().expect("failed to load chain specification");
+	let base_path = if let Some(base) = Node::base_path() {
+		BasePath::new(base)
+	} else {
+		BasePath::new_temp_dir().expect("couldn't create a temp dir")
+	};
 	let root_path = base_path.path()
 		.to_path_buf()
 		.join("chains")
-		.join("flamingfir8");
+		.join(chain_spec.id());
+	println!("\n\n\n\n{:?}\n\n\n\n", root_path);
+
 	let role = Role::Authority {
 		sentry_nodes: Vec::new(),
 	};
 	let key_seed = Sr25519Keyring::Alice.to_seed();
-	let mut chain_spec = Node::load_spec().expect("failed to load chain specification");
 	let storage = chain_spec
 		.as_storage_builder()
 		.build_storage()
@@ -425,6 +437,7 @@ fn build_logger<LogSink>(executor: tokio::runtime::Handle, log_sink: LogSink)
 	builder.write_style(env_logger::WriteStyle::Always);
 	builder.filter_level(log::LevelFilter::Debug);
 	builder.filter_module("runtime", log::LevelFilter::Trace);
+	builder.filter_module("babe", log::LevelFilter::Info);
 	builder.filter_module("sc_service", log::LevelFilter::Trace);
 	for module in &ignore {
 		builder.filter_module(module, log::LevelFilter::Info);

@@ -8,7 +8,7 @@ use sp_runtime::{traits::IdentifyAccount, MultiSigner, MultiSignature};
 use substrate_test_runner::{
 	prelude::*, rpc, test, node::{InternalNode, TestRuntimeRequirements},
 };
-use sc_service::{TFullClient, new_full_parts, TFullBackend, TaskManager, Configuration};
+use sc_service::{TFullClient, new_full_parts, TFullBackend, TaskManager, Configuration, ChainType};
 use parity_scale_codec::alloc::sync::Arc;
 use sc_keystore::KeyStorePtr;
 use sp_inherents::InherentDataProviders;
@@ -17,6 +17,7 @@ use sc_finality_grandpa::GrandpaBlockImport;
 use manual_seal::consensus::{ConsensusDataProvider,	babe::BabeConsensusDataProvider};
 use sp_api::TransactionFor;
 use sp_application_crypto::sr25519;
+use node_cli::chain_spec::{ChainSpec, testnet_genesis, authority_keys_from_seed, get_account_id_from_seed};
 
 struct Node;
 
@@ -36,7 +37,31 @@ impl TestRuntimeRequirements for Node {
 	>;
 
 	fn load_spec() -> Result<Box<dyn sc_service::ChainSpec>, String> {
-		Ok(Box::new(node_cli::chain_spec::development_config()))
+		let chain_spec = ChainSpec::from_genesis(
+			"Development",
+			"flamingfir8",
+			ChainType::Development,
+			|| {
+				testnet_genesis(
+					vec![
+						authority_keys_from_seed("Alice"),
+					],
+					get_account_id_from_seed::<sr25519::Public>("Alice"),
+					None,
+					true,
+				)
+			},
+			vec![],
+			None,
+			None,
+			None,
+			Default::default(),
+		);
+		Ok(Box::new(chain_spec))
+	}
+
+	fn base_path() -> Option<&'static str> {
+		Some("/home/seunlanlege/.local/share/substrate")
 	}
 
 	fn create_client_parts(config: &Configuration) -> Result<
@@ -145,34 +170,34 @@ fn should_read_state() {
 
 	type Balances = pallet_balances::Module<Runtime>;
 
-	// test.produce_blocks(1);
-	//
-	// let alice = Sr25519Keyring::Alice.pair();
-	// let bob = Sr25519Keyring::Bob.pair();
-	// let bob_public = bob.public();
-	//
-	// let signer = Signer::<Runtime, Sr25519>::all_accounts()
-	// 	// only use alice' account for signing
-	// 	.with_filter(vec![alice.public().into()]);
-	//
-	// let bob_balance = test.with_state(|| {
-	// 	Balances::free_balance(MultiSigner::from(bob_public).into_account())
-	// });
+	test.produce_blocks(1);
 
-	// let mut result = test.with_state(|| {
-	// 	signer.send_signed_transaction(|_account| {
-	// 		BalancesCall::transfer(MultiSigner::from(bob_public).into_account().into(), 8900000000000000)
-	// 	})
-	// });
-	//
-	// assert!(result.pop().unwrap().1.is_ok());
+	let alice = Sr25519Keyring::Alice.pair();
+	let bob = Sr25519Keyring::Bob.pair();
+	let bob_public = bob.public();
 
-	test.produce_blocks(220);
-	//
-	// let new_bob_balance = test.with_state(|| {
-	// 	Balances::free_balance(MultiSigner::from(bob_public).into_account())
-	// });
-	//
+	let signer = Signer::<Runtime, Sr25519>::all_accounts()
+		// only use alice' account for signing
+		.with_filter(vec![alice.public().into()]);
+
+	let bob_balance = test.with_state(|| {
+		Balances::free_balance(MultiSigner::from(bob_public).into_account())
+	});
+
+	let mut result = test.with_state(|| {
+		signer.send_signed_transaction(|_account| {
+			BalancesCall::transfer(MultiSigner::from(bob_public).into_account().into(), 8900000000000000)
+		})
+	});
+
+	assert!(result.pop().unwrap().1.is_ok());
+
+	test.produce_blocks(1);
+
+	let new_bob_balance = test.with_state(|| {
+		Balances::free_balance(MultiSigner::from(bob_public).into_account())
+	});
+
 	// assert_eq!((new_bob_balance - bob_balance), 8900000000000000);
 }
 
