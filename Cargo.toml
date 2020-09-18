@@ -6,45 +6,46 @@ edition = "2018"
 
 [dependencies]
 # client deps
-sc-executor = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sc-service = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sc-informant = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sc-network = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sc-cli = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sc-rpc-api = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sc-basic-authorship = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sc-rpc = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sc-consensus = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sc-finality-grandpa = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sc-consensus-babe = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sc-transaction-pool = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sc-client-db = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sc-client-api = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-manual-seal = { package = "sc-consensus-manual-seal", git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
+sc-executor = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-service = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-informant = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-network = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-cli = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-rpc-api = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-basic-authorship = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-rpc = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-consensus = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-finality-grandpa = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-consensus-babe = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-transaction-pool = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-client-db = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-client-api = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+manual-seal = { package = "sc-consensus-manual-seal", git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 
 # primitive deps
-sp-core = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sp-blockchain = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sp-block-builder = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sp-api = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sp-application-crypto = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sp-transaction-pool = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sp-consensus-babe = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sp-consensus = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sc-keystore = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sp-runtime = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sp-session = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sp-offchain = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sp-inherents = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sp-timestamp = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sp-keyring = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sp-externalities = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-sp-storage = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
+sp-core = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-blockchain = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-block-builder = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-api = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-application-crypto = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-transaction-pool = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-consensus-babe = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-consensus = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-keystore = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-runtime = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-session = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-offchain = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-inherents = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-timestamp = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-keyring = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-externalities = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-storage = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 
 # pallets
-frame-system = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-pallet-balances = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-pallet-indices = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
+frame-system = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+pallet-balances = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+pallet-indices = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+pallet-transaction-payment = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 finality-grandpa = "0.12.3"
 
 parity-scale-codec = "1.3.1"
@@ -58,6 +59,7 @@ futures01 = { package = "futures", version = "0.1.29" }
 futures = { package = "futures", version = "0.3", features = ["compat"] }
 rand = "0.7"
 parking_lot = "0.10"
+hex = "0.4.2"
 tokio = { version = "0.2", features = ["full"] }
 
 # Calling RPC
@@ -69,12 +71,12 @@ url = "1.7"
 primitive-types = "0.7"
 
 [dev-dependencies]
-node-runtime = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-node-executor = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-node-primitives = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
-node-cli = { git = "https://github.com/paritytech/substrate.git", rev = "98ef10c53" }
+node-runtime = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+node-executor = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+node-primitives = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+node-cli = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 
-#polkadot-runtime = { git = "https://github.com/paritytech/polkadot.git", rev = "master" }
-#polkadot-core-primitives = { git = "https://github.com/paritytech/polkadot.git", rev = "master" }
-#polkadot-service = { git = "https://github.com/paritytech/polkadot.git", rev = "master" }
-#polkadot-cli = { git = "https://github.com/paritytech/polkadot.git", rev = "master" }
+polkadot-runtime = { git = "https://github.com/paritytech/polkadot.git", branch = "seun-babe-manual-seal" }
+polkadot-core-primitives = { git = "https://github.com/paritytech/polkadot.git", branch = "seun-babe-manual-seal" }
+polkadot-service = { git = "https://github.com/paritytech/polkadot.git", branch = "seun-babe-manual-seal" }
+polkadot-runtime-common = { git = "https://github.com/paritytech/polkadot.git", branch = "seun-babe-manual-seal" }

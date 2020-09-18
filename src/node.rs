@@ -438,6 +438,7 @@ fn build_logger<LogSink>(executor: tokio::runtime::Handle, log_sink: LogSink)
 	builder.filter_level(log::LevelFilter::Debug);
 	builder.filter_module("runtime", log::LevelFilter::Trace);
 	builder.filter_module("babe", log::LevelFilter::Info);
+	builder.filter_module("manual-seal", log::LevelFilter::Trace);
 	builder.filter_module("sc_service", log::LevelFilter::Trace);
 	for module in &ignore {
 		builder.filter_module(module, log::LevelFilter::Info);

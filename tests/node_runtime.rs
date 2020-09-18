@@ -18,6 +18,7 @@ use manual_seal::consensus::{ConsensusDataProvider,	babe::BabeConsensusDataProvi
 use sp_api::TransactionFor;
 use sp_application_crypto::sr25519;
 use node_cli::chain_spec::{ChainSpec, testnet_genesis, authority_keys_from_seed, get_account_id_from_seed};
+use sp_consensus_babe::AuthorityId;
 
 struct Node;
 
@@ -110,6 +111,7 @@ impl TestRuntimeRequirements for Node {
 			keystore.clone(),
 			&inherent_providers,
 			babe_link.epoch_changes().clone(),
+			vec![(AuthorityId::from(Sr25519Keyring::Alice.public()), 1000)]
 		)
 		.expect("failed to create DigestProvider");
 
