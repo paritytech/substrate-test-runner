@@ -2,7 +2,7 @@ use frame_system::offchain::{SendSignedTransaction, Signer};
 use futures::compat::Future01CompatExt;
 use pallet_balances::Call as BalancesCall;
 use polkadot_runtime::{Runtime, UncheckedExtrinsic, SignedExtra};
-use sp_core::crypto::Pair;
+use sp_core::crypto::{Pair, AccountId32};
 use sp_keyring::Sr25519Keyring;
 use sp_runtime::{traits::{IdentifyAccount, Extrinsic}, MultiSigner, MultiSignature};
 use substrate_test_runner::{
@@ -22,6 +22,7 @@ use sp_keyring::sr25519::Keyring::Alice;
 use polkadot_service::{PolkadotChainSpec, chain_spec::polkadot_development_config_genesis};
 use sp_runtime::generic::Era;
 use parity_scale_codec::Encode;
+use std::str::FromStr;
 
 struct Node;
 
@@ -56,9 +57,9 @@ impl TestRuntimeRequirements for Node {
 		)))
 	}
 
-	// fn base_path() -> Option<&'static str> {
-	// 	Some("/home/seun/.local/share/polkadot")
-	// }
+	fn base_path() -> Option<&'static str> {
+		Some("/home/seun/.local/share/polkadot")
+	}
 
 	fn create_client_parts(config: &Configuration) -> Result<
 		(
@@ -159,10 +160,6 @@ fn should_run_off_chain_worker() {
 	test.assert_log_line("best = true");
 }
 
-fn mock_crypto () {
-
-}
-
 #[test]
 fn should_read_state() {
 	// given
@@ -174,10 +171,19 @@ fn should_read_state() {
 	test.produce_blocks(1);
 
 	let alice = Sr25519Keyring::Alice.pair();
-	let bob = Sr25519Keyring::Bob.pair();
-	let bob_public = bob.public();
+	let alice_account_id = MultiSigner::from(alice.public()).into_account();
+	let call = BalancesCall::transfer(alice_account_id.clone().into(), 7825388000000);
+	// random address on chain.
+	let address = AccountId32::from_str("1rvXMZpAj9nKLQkPFCymyH7Fg3ZyKJhJbrc7UtHbTVhJm1A").unwrap();
 
-	let call = BalancesCall::transfer(MultiSigner::from(alice.public()).into_account().into(), 8900000000000000);
+	let (account_nonce, account_balance) = test.with_state(|| {
+		(
+			frame_system::Module::<Runtime>::account_nonce(address.clone()),
+			Balances::free_balance(address.clone())
+		)
+	});
+
+	println!("\n\naccount_nonce: {:?}\n\n\n\n\naccount_balance: {:?}\n\n\n", account_nonce, account_balance);
 
 	let extra: SignedExtra = test.with_state(|| {
 		(
@@ -185,13 +191,12 @@ fn should_read_state() {
 			frame_system::CheckTxVersion::<Runtime>::new(),
 			frame_system::CheckGenesis::<Runtime>::new(),
 			frame_system::CheckMortality::<Runtime>::from(Era::Immortal),
-			frame_system::CheckNonce::<Runtime>::from(0),
+			frame_system::CheckNonce::<Runtime>::from(account_nonce),
 			frame_system::CheckWeight::<Runtime>::new(),
 			pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(0),
 			polkadot_runtime_common::claims::PrevalidateAttests::<Runtime>::new(),
 		)
 	});
-	let address = MultiSigner::from(alice.public()).into_account();
 	let signed_data = Some(((address, Default::default(), extra)));
 	let extrinsic = UncheckedExtrinsic::new(call.into(), signed_data).unwrap();
 	let bytes = extrinsic.encode();
@@ -201,8 +206,18 @@ fn should_read_state() {
 			.compat()
 			.await;
 
-		println!("\n\n{:?}\n\n\n", result);
+		println!("\n\ntransaction: {:?}\n\n\n", result);
 	});
+
+	test.produce_blocks(1);
+
+	let alice_balance = test.with_state(|| {
+		Balances::free_balance(alice_account_id)
+	});
+
+	println!("\n\nalice_balance: {:?}\n\n\n", alice_balance);
+
+	// todo should probably have an api for deleting blocks.
 }
 
 #[test]
