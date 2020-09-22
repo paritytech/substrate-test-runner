@@ -23,10 +23,20 @@ use polkadot_service::{PolkadotChainSpec, chain_spec::polkadot_development_confi
 use sp_runtime::generic::Era;
 use parity_scale_codec::Encode;
 use std::str::FromStr;
+use sp_core::{traits::CryptoExt, ed25519};
 
 struct Node;
 
 type BlockImport<B, BE, C, SC> = BabeBlockImport<B, C, GrandpaBlockImport<BE, B, C, SC>>;
+
+struct NonVerifyingCrypto;
+
+impl CryptoExt for NonVerifyingCrypto {
+	fn ed25519_verify(&self, sig: &ed25519::Signature, msg: &[u8], pubkey: &ed25519::Public) -> bool {
+		true
+	}
+}
+
 
 impl TestRuntimeRequirements for Node {
 	type Block = polkadot_core_primitives::Block;
@@ -87,7 +97,7 @@ impl TestRuntimeRequirements for Node {
 			backend,
 			keystore,
 			task_manager,
-		) = new_full_parts::<Self::Block, Self::RuntimeApi, Self::Executor>(config)?;
+		) = new_full_parts::<Self::Block, Self::RuntimeApi, Self::Executor>(config, Some(Arc::new(NonVerifyingCrypto)))?;
 		let client = Arc::new(client);
 
 		let inherent_providers = InherentDataProviders::new();
