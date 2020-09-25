@@ -12,6 +12,6 @@ pub fn blackbox_internal<R: TestRuntimeRequirements>(node: InternalNode<R>) -> b
 	blackbox::BlackBox::new(blackbox::BlackBoxNode::Internal(node))
 }
 
-pub fn deterministic<R: TestRuntimeRequirements + 'static>(node: InternalNode<R>) -> deterministic::Deterministic<R> {
-	deterministic::Deterministic::new(node)
+pub fn deterministic<R: TestRuntimeRequirements + 'static>() -> deterministic::Deterministic<R> {
+	deterministic::Deterministic::new(InternalNode::<R>::new().unwrap())
 }

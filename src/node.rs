@@ -2,7 +2,6 @@ use std::io::Write;
 use std::marker::PhantomData;
 use std::sync::Arc;
 use std::fmt;
-use std::path::PathBuf;
 
 use futures::{channel::mpsc, FutureExt, Sink, SinkExt};
 use jsonrpc_core::MetaIoHandler;
@@ -27,21 +26,23 @@ use sp_block_builder::BlockBuilder;
 use sp_inherents::InherentDataProviders;
 use sp_keyring::Sr25519Keyring;
 use sp_offchain::OffchainWorkerApi;
-use sp_runtime::traits::Block as BlockT;
+use sp_runtime::traits::{Block as BlockT, SignedExtension};
 use sp_session::SessionKeys;
 use sp_transaction_pool::runtime_api::TaggedTransactionQueue;
 use sc_keystore::KeyStorePtr;
 use sp_consensus::{BlockImport, SelectChain};
+use sp_runtime::sp_std::cell::RefCell;
+use crate::rpc;
 
 /// This holds a reference to a running node on another thread,
 /// the node process is dropped when this struct is dropped
 /// also holds logs from the process.
 pub struct InternalNode<Node> {
 	/// rpc handler for communicating with the node over rpc.
-	rpc_handlers: Arc<MetaIoHandler<sc_rpc::Metadata>>,
+	rpc_handlers: Arc<MetaIoHandler<sc_rpc::Metadata, sc_rpc_server::RpcMiddleware>>,
 
 	/// tokio-compat runtime
-	compat_runtime: tokio_compat::runtime::Runtime,
+	compat_runtime: RefCell<tokio_compat::runtime::Runtime>,
 
 	///Stream of log lines
 	log_stream: futures::channel::mpsc::UnboundedReceiver<String>,
@@ -192,13 +193,13 @@ impl<Node> InternalNode<Node> {
 			_task_manager: Some(task_manager),
 			_phantom: PhantomData,
 			_runtime: tokio_runtime,
-			compat_runtime,
+			compat_runtime: RefCell::new(compat_runtime),
 			log_stream,
 		})
 	}
 
 	/// returns a reference to the rpc handlers.
-	pub fn rpc_handler(&self) -> Arc<MetaIoHandler<sc_rpc::Metadata>> {
+	pub fn rpc_handler(&self) -> Arc<MetaIoHandler<sc_rpc::Metadata, sc_rpc_server::RpcMiddleware>> {
 		self.rpc_handlers.clone()
 	}
 
@@ -209,14 +210,30 @@ impl<Node> InternalNode<Node> {
 	{
 		use futures01::Future;
 		let rpc_handler = self.rpc_handlers.clone();
-		let (client, fut) = local::connect::<C, _, _>(rpc_handler);
+		let (client, fut) = local::connect::<C, Arc<MetaIoHandler<sc_rpc::Metadata, sc_rpc_server::RpcMiddleware>>, sc_rpc::Metadata>(rpc_handler);
 		self.compat_runtime.spawn(fut.map_err(|_| ()));
 		client
 	}
 
 	/// provides access to the tokio compat runtime.
-	pub fn compat_runtime(&mut self) -> &mut tokio_compat::runtime::Runtime {
-		&mut self.compat_runtime
+	pub fn compat_runtime(&self) -> &RefCell<tokio_compat::runtime::Runtime> {
+		&self.compat_runtime
+	}
+
+	pub fn send_extrinsic(
+		&self,
+		call: impl Into<<Node::Runtime as frame_system::Trait>::Call>,
+		from: <Node::Runtime as frame_system::Trait>::AccountId,
+	) {
+		let extra = Node::signed_extras(&self, from.clone());
+		let signed_data = Some(((from, Default::default(), extra)));
+		let ext = UncheckedExtrinsic::new(call.into(), signed_data);
+		let rpc_client = self.rpc_client::<rpc::AuthorClient<T>>();
+		self.compat_runtime.borrow_mut().block_on_std(async move {
+			let result = rpc_client.submit_extrinsic(ext.encode().into()).compat().await;
+			assert_matches!(result, Ok);
+			log::info!("successfully submitted extrinsic to pool with hash: {}", result.unwrap());
+		});
 	}
 
 	/// provides access to the tokio runtime.
@@ -269,6 +286,8 @@ pub trait TestRuntimeRequirements {
 			>
 		> + 'static;
 
+	type SignedExtension: SignedExtension;
+
 	/// chain spec factory
 	fn load_spec() -> Result<Box<dyn ChainSpec>, String>;
 
@@ -276,6 +295,12 @@ pub trait TestRuntimeRequirements {
 	fn base_path() -> Option<&'static str> {
 		None
 	}
+
+	/// Signed extras.
+	fn signed_extras(
+		node: &InternalNode<Self>,
+		from: <Self::Runtime as frame_system::Trait>::AccountId,
+	) -> Self::SignedExtension;
 
 	/// Attempt to create client parts, including blockimport,
 	/// selectchain strategy and consensus data provider.

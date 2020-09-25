@@ -24,6 +24,7 @@ use sp_runtime::generic::Era;
 use parity_scale_codec::Encode;
 use std::str::FromStr;
 use sp_core::{traits::CryptoExt, ed25519};
+use sc_client_api::ExecutorProvider;
 
 struct Node;
 
@@ -32,7 +33,7 @@ type BlockImport<B, BE, C, SC> = BabeBlockImport<B, C, GrandpaBlockImport<BE, B,
 struct NonVerifyingCrypto;
 
 impl CryptoExt for NonVerifyingCrypto {
-	fn ed25519_verify(&self, sig: &ed25519::Signature, msg: &[u8], pubkey: &ed25519::Public) -> bool {
+	fn ed25519_verify(&self, _sig: &ed25519::Signature, _msg: &[u8], _pubkey: &ed25519::Public) -> bool {
 		true
 	}
 }
@@ -50,6 +51,7 @@ impl TestRuntimeRequirements for Node {
 		TFullClient<Self::Block, Self::RuntimeApi, Self::Executor>,
 		Self::SelectChain,
 	>;
+	type SignedExtension = SignedExtra;
 
 	fn load_spec() -> Result<Box<dyn sc_service::ChainSpec>, String> {
 		let wasm_binary = polkadot_runtime::WASM_BINARY.ok_or("Polkadot development wasm not available")?;
@@ -69,6 +71,28 @@ impl TestRuntimeRequirements for Node {
 
 	fn base_path() -> Option<&'static str> {
 		Some("/home/seun/.local/share/polkadot")
+	}
+
+	fn signed_extras(
+		node: &InternalNode<Self>,
+		from: <Self::Runtime as frame_system::Trait>::AccountId,
+	) -> Self::SignedExtension {
+		let nonce = node.with_state(|| {
+			frame_system::Module::<Self::Runtime>::account_nonce(from.clone())
+		});
+
+		node.with_state(|| {
+			(
+				frame_system::CheckSpecVersion::<Self::Runtime>::new(),
+				frame_system::CheckTxVersion::<Self::Runtime>::new(),
+				frame_system::CheckGenesis::<Self::Runtime>::new(),
+				frame_system::CheckMortality::<Self::Runtime>::from(Era::Immortal),
+				frame_system::CheckNonce::<Self::Runtime>::from(nonce),
+				frame_system::CheckWeight::<Self::Runtime>::new(),
+				pallet_transaction_payment::ChargeTransactionPayment::<Self::Runtime>::from(0),
+				polkadot_runtime_common::claims::PrevalidateAttests::<Self::Runtime>::new(),
+			)
+		})
 	}
 
 	fn create_client_parts(config: &Configuration) -> Result<
@@ -97,8 +121,10 @@ impl TestRuntimeRequirements for Node {
 			backend,
 			keystore,
 			task_manager,
-		) = new_full_parts::<Self::Block, Self::RuntimeApi, Self::Executor>(config, Some(Arc::new(NonVerifyingCrypto)))?;
+		) = new_full_parts::<Self::Block, Self::RuntimeApi, Self::Executor>(config)?;
 		let client = Arc::new(client);
+		// register the extension, we would like for the chain to not have any signature verification.
+		client.execution_extensions().register_crypto_extension(Arc::new(NonVerifyingCrypto));
 
 		let inherent_providers = InherentDataProviders::new();
 		let select_chain = sc_consensus::LongestChain::new(backend.clone());
@@ -142,7 +168,6 @@ impl frame_system::offchain::AppCrypto<MultiSigner, MultiSignature> for Sr25519 
 	type GenericSignature = sp_core::sr25519::Signature;
 }
 
-
 #[test]
 fn should_run_off_chain_worker() {
 	let node = InternalNode::<Node>::new().unwrap();
@@ -171,10 +196,9 @@ fn should_run_off_chain_worker() {
 }
 
 #[test]
-fn should_read_state() {
+fn should_read_and_write_state() {
 	// given
-	let node = InternalNode::<Node>::new().unwrap();
-	let mut test = test::deterministic(node);
+	let mut test = test::deterministic();
 
 	type Balances = pallet_balances::Module<Runtime>;
 
@@ -182,42 +206,17 @@ fn should_read_state() {
 
 	let alice = Sr25519Keyring::Alice.pair();
 	let alice_account_id = MultiSigner::from(alice.public()).into_account();
-	let call = BalancesCall::transfer(alice_account_id.clone().into(), 7825388000000);
-	// random address on chain.
-	let address = AccountId32::from_str("1rvXMZpAj9nKLQkPFCymyH7Fg3ZyKJhJbrc7UtHbTVhJm1A").unwrap();
 
-	let (account_nonce, account_balance) = test.with_state(|| {
-		(
-			frame_system::Module::<Runtime>::account_nonce(address.clone()),
-			Balances::free_balance(address.clone())
-		)
+	let alice_balance = test.with_state(|| {
+		Balances::free_balance(alice_account_id.clone())
 	});
 
-	println!("\n\naccount_nonce: {:?}\n\n\n\n\naccount_balance: {:?}\n\n\n", account_nonce, account_balance);
+	println!("\n\nalice_balance: {:?}\n\n\n", alice_balance);
 
-	let extra: SignedExtra = test.with_state(|| {
-		(
-			frame_system::CheckSpecVersion::<Runtime>::new(),
-			frame_system::CheckTxVersion::<Runtime>::new(),
-			frame_system::CheckGenesis::<Runtime>::new(),
-			frame_system::CheckMortality::<Runtime>::from(Era::Immortal),
-			frame_system::CheckNonce::<Runtime>::from(account_nonce),
-			frame_system::CheckWeight::<Runtime>::new(),
-			pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(0),
-			polkadot_runtime_common::claims::PrevalidateAttests::<Runtime>::new(),
-		)
-	});
-	let signed_data = Some(((address, Default::default(), extra)));
-	let extrinsic = UncheckedExtrinsic::new(call.into(), signed_data).unwrap();
-	let bytes = extrinsic.encode();
-	let client = test.rpc_client::<rpc::AuthorClient<Runtime>>();
-	test.compat_runtime().block_on_std(async move {
-		let result = client.submit_extrinsic(bytes.into())
-			.compat()
-			.await;
-
-		println!("\n\ntransaction: {:?}\n\n\n", result);
-	});
+	test.send_extrinsic(
+		BalancesCall::transfer(alice_account_id.clone().into(), 7825388000000),
+		AccountId32::from_str("1rvXMZpAj9nKLQkPFCymyH7Fg3ZyKJhJbrc7UtHbTVhJm1A").unwrap()
+	);
 
 	test.produce_blocks(1);
 
@@ -227,6 +226,7 @@ fn should_read_state() {
 
 	println!("\n\nalice_balance: {:?}\n\n\n", alice_balance);
 
+	assert_eq!(old_alice_balance + 7825388000000, alice_balance);
 	// todo should probably have an api for deleting blocks.
 }
 
