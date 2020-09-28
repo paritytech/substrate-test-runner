@@ -11,26 +11,6 @@ pub struct TestExternalities<Node: TestRuntimeRequirements> {
 	extensions: Extensions,
 }
 
-pub struct TxPoolExtApi<Node: TestRuntimeRequirements> {
-	client: rpc::AuthorClient<Node::Runtime>,
-}
-
-impl<Node: TestRuntimeRequirements> TransactionPool for TxPoolExtApi<Node> {
-	fn submit_transaction(&mut self, extrinsic: Vec<u8>) -> Result<(), ()> {
-		match self.client.submit_extrinsic(extrinsic.into()).wait() {
-			Ok(hash) => log::info!("extrinsic successfully submitted with hash {:?}", hash),
-			Err(err) => log::error!("error submitting extrinsic {:?}", err),
-		};
-		Ok(())
-	}
-}
-
-impl<Node: TestRuntimeRequirements> TxPoolExtApi<Node> {
-	pub fn new(client: rpc::AuthorClient<Node::Runtime>) -> Self {
-		Self { client }
-	}
-}
-
 impl<Node: TestRuntimeRequirements> TestExternalities<Node> {
 	pub fn new(client: rpc::StateClient<Node::Runtime>) -> Self {
 		Self {

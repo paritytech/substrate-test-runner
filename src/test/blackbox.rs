@@ -9,7 +9,7 @@ use crate::node::TestRuntimeRequirements;
 
 /// A black box node, either runs a background node,
 /// or connects via ws to a running node.
-pub enum BlackBoxNode<N> {
+pub enum BlackBoxNode<N: TestRuntimeRequirements> {
 	/// Connects to an external node.
 	External(String),
 	/// Spawns a pristine node.
@@ -17,7 +17,7 @@ pub enum BlackBoxNode<N> {
 }
 
 /// A black box test.
-pub struct BlackBox<N> {
+pub struct BlackBox<N: TestRuntimeRequirements> {
 	node: BlackBoxNode<N>,
 }
 
@@ -36,14 +36,14 @@ impl<N> BlackBox<N>
 	}
 }
 
-impl<N> rpc::RpcExtension for BlackBox<N> {
+impl<N: TestRuntimeRequirements> rpc::RpcExtension for BlackBox<N> {
 	fn rpc<TClient: From<RpcChannel> + 'static>(&mut self) -> TClient {
 		let client = match self.node {
 			BlackBoxNode::External(ref url) => futures::executor::block_on(rpc::connect_ws(&url)).unwrap(),
 			BlackBoxNode::Internal(ref mut node) => {
 				use futures01::Future;
-				let (client, fut) = local::connect::<TClient, _, _>(node.rpc_handler());
-				node.compat_runtime().spawn(fut.map_err(|_| ()));
+				let (client, fut) = local::connect::<TClient, _, _, _>(node.rpc_handler());
+				node.compat_runtime().borrow().spawn(fut.map_err(|_| ()));
 
 				client
 			}
@@ -52,7 +52,7 @@ impl<N> rpc::RpcExtension for BlackBox<N> {
 	}
 }
 
-impl<N> BlackBox<N>{
+impl<N: TestRuntimeRequirements> BlackBox<N>{
 	/// Create an instance of `BlackBox`.
 	pub fn new(node: BlackBoxNode<N>) -> Self {
 		Self { node }

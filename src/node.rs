@@ -9,8 +9,9 @@ use jsonrpc_core_client::{transports::local, RpcChannel};
 use manual_seal::{
 	run_manual_seal, ManualSealParams, consensus::ConsensusDataProvider,
 };
+use futures::{compat::Future01CompatExt};
 use sc_cli::build_runtime;
-use sc_client_api::{backend::Backend, execution_extensions::ExecutionStrategies};
+use sc_client_api::{backend::Backend, execution_extensions::ExecutionStrategies, ExecutorProvider};
 use sc_executor::NativeExecutionDispatch;
 use sc_informant::OutputFormat;
 use sc_network::{config::TransportConfig, multiaddr};
@@ -26,23 +27,36 @@ use sp_block_builder::BlockBuilder;
 use sp_inherents::InherentDataProviders;
 use sp_keyring::Sr25519Keyring;
 use sp_offchain::OffchainWorkerApi;
-use sp_runtime::traits::{Block as BlockT, SignedExtension};
+use sp_runtime::{traits::{Block as BlockT, SignedExtension}, generic::UncheckedExtrinsic};
 use sp_session::SessionKeys;
 use sp_transaction_pool::runtime_api::TaggedTransactionQueue;
 use sc_keystore::KeyStorePtr;
 use sp_consensus::{BlockImport, SelectChain};
 use sp_runtime::sp_std::cell::RefCell;
 use crate::rpc;
+use sp_core::{ed25519, sr25519, ecdsa};
+use sp_runtime::traits::Extrinsic;
+use sp_core::traits::CryptoExt;
+use parity_scale_codec::Encode;
+use crate::test::externalities::TestExternalities;
+
+mod crypto;
+pub mod utils;
+
+use self::{
+	crypto::NonVerifyingCrypto,
+	utils::{build_config, build_logger, StateProvider}
+};
 
 /// This holds a reference to a running node on another thread,
 /// the node process is dropped when this struct is dropped
 /// also holds logs from the process.
-pub struct InternalNode<Node> {
+pub struct InternalNode<Node: TestRuntimeRequirements> {
 	/// rpc handler for communicating with the node over rpc.
-	rpc_handlers: Arc<MetaIoHandler<sc_rpc::Metadata, sc_rpc_server::RpcMiddleware>>,
+	rpc_handler: Arc<MetaIoHandler<sc_rpc::Metadata, sc_rpc_server::RpcMiddleware>>,
 
 	/// tokio-compat runtime
-	compat_runtime: RefCell<tokio_compat::runtime::Runtime>,
+	_compat_runtime: RefCell<tokio_compat::runtime::Runtime>,
 
 	///Stream of log lines
 	log_stream: futures::channel::mpsc::UnboundedReceiver<String>,
@@ -53,28 +67,30 @@ pub struct InternalNode<Node> {
 	/// handle to the running node.
 	_task_manager: Option<TaskManager>,
 
+	/// externalities
+	externalities: RefCell<TestExternalities<Node>>,
+
 	_phantom: PhantomData<Node>,
 }
 
-impl<Node> InternalNode<Node> {
+impl<Node: TestRuntimeRequirements> InternalNode<Node> {
 	/// Starts a node with the manual-seal authorship,
 	pub fn new() -> Result<Self, sc_service::Error>
 		where
-			Node: TestRuntimeRequirements,
 			<Node::RuntimeApi as
 				ConstructRuntimeApi<
 					Node::Block,
 					TFullClient<Node::Block, Node::RuntimeApi, Node::Executor>
 				>
 			>::RuntimeApi: Core<Node::Block> + Metadata<Node::Block>
-				+ OffchainWorkerApi<Node::Block> + SessionKeys<Node::Block>
-				+ TaggedTransactionQueue<Node::Block> + BlockBuilder<Node::Block>
-				+ ApiErrorExt<Error=sp_blockchain::Error>
-				+ ApiExt<
-					Node::Block,
-					StateBackend =
-						<TFullBackend<Node::Block> as Backend<Node::Block>>::State,
-					>,
+			+ OffchainWorkerApi<Node::Block> + SessionKeys<Node::Block>
+			+ TaggedTransactionQueue<Node::Block> + BlockBuilder<Node::Block>
+			+ ApiErrorExt<Error=sp_blockchain::Error>
+			+ ApiExt<
+				Node::Block,
+				StateBackend =
+				<TFullBackend<Node::Block> as Backend<Node::Block>>::State,
+			>,
 	{
 		let compat_runtime = tokio_compat::runtime::Runtime::new().unwrap();
 		let tokio_runtime = build_runtime().unwrap();
@@ -104,6 +120,9 @@ impl<Node> InternalNode<Node> {
 			select_chain,
 			block_import,
 		) = Node::create_client_parts(&config)?;
+
+		// register the extension, we would like for the chain to not have any signature verification.
+		client.execution_extensions().register_crypto_extension(Arc::new(NonVerifyingCrypto));
 
 		let import_queue =
 			manual_seal::import_queue(Box::new(block_import.clone()), &task_manager.spawn_handle(), None);
@@ -187,20 +206,56 @@ impl<Node> InternalNode<Node> {
 			.spawn("manual-seal", authorship_future);
 
 		network_starter.start_network();
+		let rpc_handler = rpc_handlers.io_handler();
+		let (client, fut) = local::connect::<
+			rpc::StateClient<Node::Runtime>,
+			Arc<MetaIoHandler<sc_rpc::Metadata, sc_rpc_server::RpcMiddleware>>,
+			_, _>(rpc_handler.clone());
+
+		use futures01::Future;
+		compat_runtime.spawn(fut.map_err(|_| ()));
 
 		Ok(Self {
-			rpc_handlers: rpc_handlers.io_handler(),
+			rpc_handler,
 			_task_manager: Some(task_manager),
 			_phantom: PhantomData,
 			_runtime: tokio_runtime,
-			compat_runtime: RefCell::new(compat_runtime),
+			_compat_runtime: RefCell::new(compat_runtime),
+			externalities: TestExternalities::new(client),
 			log_stream,
 		})
 	}
 
 	/// returns a reference to the rpc handlers.
 	pub fn rpc_handler(&self) -> Arc<MetaIoHandler<sc_rpc::Metadata, sc_rpc_server::RpcMiddleware>> {
-		self.rpc_handlers.clone()
+		self.rpc_handler.clone()
+	}
+
+	/// send some extrinsic to the node, providing the sending account.
+	pub fn send_extrinsic(
+		&self,
+		call: impl Into<<Node::Runtime as frame_system::Trait>::Call>,
+		from: <Node::Runtime as frame_system::Trait>::AccountId,
+	)
+		where
+			<Node::Runtime as frame_system::Trait>::AccountId: Encode,
+			<Node::Runtime as frame_system::Trait>::Call: Encode,
+	{
+		let extra = Node::signed_extras::<Self>(&self, from.clone());
+		let signed_data = Some((from, Default::default(), extra));
+		let ext = UncheckedExtrinsic::<
+			<Node::Runtime as frame_system::Trait>::AccountId,
+			<Node::Runtime as frame_system::Trait>::Call,
+			ed25519::Signature,
+			Node::SignedExtension,
+		>::new(call.into(), signed_data).unwrap();
+		let rpc_client = self.rpc_client::<rpc::AuthorClient<Node::Runtime>>();
+
+		self.compat_runtime().borrow_mut().block_on_std(async move {
+			let result = rpc_client.submit_extrinsic(ext.encode().into()).compat().await;
+			matches!(result, Ok(_));
+			log::info!("successfully submitted extrinsic to pool with hash: {}", result.unwrap());
+		});
 	}
 
 	/// create a new jsonrpc client using the jsonrpc-core-client local transport
@@ -209,31 +264,18 @@ impl<Node> InternalNode<Node> {
 		C: From<RpcChannel> + 'static,
 	{
 		use futures01::Future;
-		let rpc_handler = self.rpc_handlers.clone();
-		let (client, fut) = local::connect::<C, Arc<MetaIoHandler<sc_rpc::Metadata, sc_rpc_server::RpcMiddleware>>, sc_rpc::Metadata>(rpc_handler);
-		self.compat_runtime.spawn(fut.map_err(|_| ()));
+		let rpc_handler = self.rpc_handler.clone();
+		let (client, fut) = local::connect::<
+			C,
+			Arc<MetaIoHandler<sc_rpc::Metadata, sc_rpc_server::RpcMiddleware>>,
+			_, _>(rpc_handler);
+		self._compat_runtime.borrow().spawn(fut.map_err(|_| ()));
 		client
 	}
 
 	/// provides access to the tokio compat runtime.
 	pub fn compat_runtime(&self) -> &RefCell<tokio_compat::runtime::Runtime> {
-		&self.compat_runtime
-	}
-
-	pub fn send_extrinsic(
-		&self,
-		call: impl Into<<Node::Runtime as frame_system::Trait>::Call>,
-		from: <Node::Runtime as frame_system::Trait>::AccountId,
-	) {
-		let extra = Node::signed_extras(&self, from.clone());
-		let signed_data = Some(((from, Default::default(), extra)));
-		let ext = UncheckedExtrinsic::new(call.into(), signed_data);
-		let rpc_client = self.rpc_client::<rpc::AuthorClient<T>>();
-		self.compat_runtime.borrow_mut().block_on_std(async move {
-			let result = rpc_client.submit_extrinsic(ext.encode().into()).compat().await;
-			assert_matches!(result, Ok);
-			log::info!("successfully submitted extrinsic to pool with hash: {}", result.unwrap());
-		});
+		&self._compat_runtime
 	}
 
 	/// provides access to the tokio runtime.
@@ -246,7 +288,7 @@ impl<Node> InternalNode<Node> {
 	}
 }
 
-impl<Node> Drop for InternalNode<Node> {
+impl<Node: TestRuntimeRequirements> Drop for InternalNode<Node> {
 	fn drop(&mut self) {
 		if let Some(mut task_manager) = self._task_manager.take() {
 			// if this isn't called the node will live forever
@@ -255,8 +297,14 @@ impl<Node> Drop for InternalNode<Node> {
 	}
 }
 
+impl<Node: TestRuntimeRequirements> StateProvider for InternalNode<Node> {
+	fn with_state<R>(&self, closure: impl FnOnce() -> R) -> R {
+		self.externalities.borrow_mut().execute_with(closure)
+	}
+}
+
 /// Wrapper trait for concrete type required by this testing framework.
-pub trait TestRuntimeRequirements {
+pub trait TestRuntimeRequirements: Sized {
 	/// Opaque block type
 	type Block: BlockT;
 
@@ -297,10 +345,12 @@ pub trait TestRuntimeRequirements {
 	}
 
 	/// Signed extras.
-	fn signed_extras(
-		node: &InternalNode<Self>,
+	fn signed_extras<S>(
+		state: &S,
 		from: <Self::Runtime as frame_system::Trait>::AccountId,
-	) -> Self::SignedExtension;
+	) -> Self::SignedExtension
+		where
+			S: StateProvider;
 
 	/// Attempt to create client parts, including blockimport,
 	/// selectchain strategy and consensus data provider.
@@ -325,148 +375,4 @@ pub trait TestRuntimeRequirements {
 		),
 		sc_service::Error
 	>;
-}
-
-/// Used to create `Configuration` object for the node.
-fn build_config<Node>(task_executor: TaskExecutor) -> Configuration
-where
-	Node: TestRuntimeRequirements,
-{
-	let mut chain_spec = Node::load_spec().expect("failed to load chain specification");
-	let base_path = if let Some(base) = Node::base_path() {
-		BasePath::new(base)
-	} else {
-		BasePath::new_temp_dir().expect("couldn't create a temp dir")
-	};
-	let root_path = base_path.path()
-		.to_path_buf()
-		.join("chains")
-		.join(chain_spec.id());
-	println!("\n\n\n\n{:?}\n\n\n\n", root_path);
-
-	let role = Role::Authority {
-		sentry_nodes: Vec::new(),
-	};
-	let key_seed = Sr25519Keyring::Alice.to_seed();
-	let storage = chain_spec
-		.as_storage_builder()
-		.build_storage()
-		.expect("could not build storage");
-
-	chain_spec.set_storage(storage);
-
-	let mut network_config = NetworkConfiguration::new(
-		format!("Polkadot Test Node for: {}", key_seed),
-		"network/test/0.1",
-		Default::default(),
-		None,
-	);
-	let informant_output_format = OutputFormat {
-		enable_color: false,
-		prefix: format!("[{}] ", key_seed),
-	};
-
-	network_config.allow_non_globals_in_dht = true;
-
-	network_config
-		.listen_addresses
-		.push(multiaddr::Protocol::Memory(rand::random()).into());
-
-	network_config.transport = TransportConfig::MemoryOnly;
-
-	Configuration {
-		impl_name: "polkadot-test-node".to_string(),
-		impl_version: "0.1".to_string(),
-		role,
-		task_executor,
-		transaction_pool: Default::default(),
-		network: network_config,
-		keystore: KeystoreConfig::Path {
-			path: root_path.join("key"),
-			password: None,
-		},
-		database: DatabaseConfig::RocksDb {
-			path: root_path.join("db"),
-			cache_size: 128,
-		},
-		state_cache_size: 16777216,
-		state_cache_child_ratio: None,
-		pruning: Default::default(),
-		chain_spec,
-		wasm_method: WasmExecutionMethod::Interpreted,
-		// NOTE: we enforce the use of the native runtime to make the errors more debuggable
-		execution_strategies: ExecutionStrategies {
-			syncing: sc_client_api::ExecutionStrategy::NativeWhenPossible,
-			importing: sc_client_api::ExecutionStrategy::NativeWhenPossible,
-			block_construction: sc_client_api::ExecutionStrategy::NativeWhenPossible,
-			offchain_worker: sc_client_api::ExecutionStrategy::NativeWhenPossible,
-			other: sc_client_api::ExecutionStrategy::NativeWhenPossible,
-		},
-		rpc_http: None,
-		rpc_ws: None,
-		rpc_ipc: None,
-		rpc_ws_max_connections: None,
-		rpc_cors: None,
-		rpc_methods: Default::default(),
-		prometheus_config: None,
-		telemetry_endpoints: None,
-		telemetry_external_transport: None,
-		default_heap_pages: None,
-		offchain_worker: Default::default(),
-		force_authoring: false,
-		disable_grandpa: false,
-		dev_key_seed: Some(key_seed),
-		tracing_targets: None,
-		tracing_receiver: Default::default(),
-		max_runtime_instances: 8,
-		announce_block: true,
-		base_path: Some(base_path),
-		informant_output_format,
-	}
-}
-
-/// Builds the global logger.
-fn build_logger<LogSink>(executor: tokio::runtime::Handle, log_sink: LogSink)
-	where
-		LogSink: Sink<String> + Clone + Unpin + Send + Sync + 'static,
-		LogSink::Error: Send + Sync + fmt::Debug,
-{
-	let ignore = [
-		"yamux",
-		"multistream_select",
-		"libp2p",
-		"jsonrpc_client_transports",
-		"sc_network",
-		"tokio_reactor",
-		"sub-libp2p",
-		"sync",
-		"peerset",
-		"ws",
-		"sc_network",
-		"sc_service",
-		"sc_peerset",
-		"rpc",
-	];
-	let mut builder = env_logger::builder();
-	builder.format(move |buf: &mut env_logger::fmt::Formatter, record: &log::Record| {
-		let entry = format!("{} {} {}", record.level(), record.target(), record.args());
-		let res = writeln!(buf, "{}", entry);
-		
-		let mut log_sink_clone = log_sink.clone();
-		let _ = executor.spawn(async move {
-			log_sink_clone.send(entry).await
-				.expect("log_stream is dropped");
-		});
-		res
-	});
-	builder.write_style(env_logger::WriteStyle::Always);
-	builder.filter_level(log::LevelFilter::Debug);
-	builder.filter_module("runtime", log::LevelFilter::Trace);
-	builder.filter_module("babe", log::LevelFilter::Info);
-	builder.filter_module("manual-seal", log::LevelFilter::Trace);
-	builder.filter_module("sc_service", log::LevelFilter::Trace);
-	for module in &ignore {
-		builder.filter_module(module, log::LevelFilter::Info);
-	}
-	let _ = builder.is_test(true).try_init();
 }

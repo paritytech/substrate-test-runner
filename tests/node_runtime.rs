@@ -145,7 +145,7 @@ fn should_run_off_chain_worker() {
 	let chain_client = test.rpc::<rpc::ChainClient<Runtime>>();
 	let rpc_client = test.raw_rpc();
 
-	test.compat_runtime().block_on_std(async {
+	test.compat_runtime().borrow_mut().block_on_std(async {
 		// TODO [ToDr] This should be even rawer - allowing to pass JSON call,
 		// which in turn could be collected from the UI.
 		let header = rpc_client

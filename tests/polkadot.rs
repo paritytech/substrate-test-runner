@@ -25,19 +25,11 @@ use parity_scale_codec::Encode;
 use std::str::FromStr;
 use sp_core::{traits::CryptoExt, ed25519};
 use sc_client_api::ExecutorProvider;
+use substrate_test_runner::node::StateProvider;
 
 struct Node;
 
 type BlockImport<B, BE, C, SC> = BabeBlockImport<B, C, GrandpaBlockImport<BE, B, C, SC>>;
-
-struct NonVerifyingCrypto;
-
-impl CryptoExt for NonVerifyingCrypto {
-	fn ed25519_verify(&self, _sig: &ed25519::Signature, _msg: &[u8], _pubkey: &ed25519::Public) -> bool {
-		true
-	}
-}
-
 
 impl TestRuntimeRequirements for Node {
 	type Block = polkadot_core_primitives::Block;
@@ -73,26 +65,27 @@ impl TestRuntimeRequirements for Node {
 		Some("/home/seun/.local/share/polkadot")
 	}
 
-	fn signed_extras(
-		node: &InternalNode<Self>,
+	fn signed_extras<S>(
+		state: &mut S,
 		from: <Self::Runtime as frame_system::Trait>::AccountId,
-	) -> Self::SignedExtension {
-		let nonce = node.with_state(|| {
+	) -> Self::SignedExtension
+	where
+		S: StateProvider
+	{
+		let nonce = state.with_state(|| {
 			frame_system::Module::<Self::Runtime>::account_nonce(from.clone())
 		});
 
-		node.with_state(|| {
-			(
-				frame_system::CheckSpecVersion::<Self::Runtime>::new(),
-				frame_system::CheckTxVersion::<Self::Runtime>::new(),
-				frame_system::CheckGenesis::<Self::Runtime>::new(),
-				frame_system::CheckMortality::<Self::Runtime>::from(Era::Immortal),
-				frame_system::CheckNonce::<Self::Runtime>::from(nonce),
-				frame_system::CheckWeight::<Self::Runtime>::new(),
-				pallet_transaction_payment::ChargeTransactionPayment::<Self::Runtime>::from(0),
-				polkadot_runtime_common::claims::PrevalidateAttests::<Self::Runtime>::new(),
-			)
-		})
+		(
+			frame_system::CheckSpecVersion::<Self::Runtime>::new(),
+			frame_system::CheckTxVersion::<Self::Runtime>::new(),
+			frame_system::CheckGenesis::<Self::Runtime>::new(),
+			frame_system::CheckMortality::<Self::Runtime>::from(Era::Immortal),
+			frame_system::CheckNonce::<Self::Runtime>::from(nonce),
+			frame_system::CheckWeight::<Self::Runtime>::new(),
+			pallet_transaction_payment::ChargeTransactionPayment::<Self::Runtime>::from(0),
+			polkadot_runtime_common::claims::PrevalidateAttests::<Self::Runtime>::new(),
+		)
 	}
 
 	fn create_client_parts(config: &Configuration) -> Result<
@@ -123,8 +116,6 @@ impl TestRuntimeRequirements for Node {
 			task_manager,
 		) = new_full_parts::<Self::Block, Self::RuntimeApi, Self::Executor>(config)?;
 		let client = Arc::new(client);
-		// register the extension, we would like for the chain to not have any signature verification.
-		client.execution_extensions().register_crypto_extension(Arc::new(NonVerifyingCrypto));
 
 		let inherent_providers = InherentDataProviders::new();
 		let select_chain = sc_consensus::LongestChain::new(backend.clone());
@@ -160,14 +151,6 @@ impl TestRuntimeRequirements for Node {
 	}
 }
 
-struct Sr25519;
-
-impl frame_system::offchain::AppCrypto<MultiSigner, MultiSignature> for Sr25519 {
-	type RuntimeAppPublic = sr25519::AppPublic;
-	type GenericPublic = sp_core::sr25519::Public;
-	type GenericSignature = sp_core::sr25519::Signature;
-}
-
 #[test]
 fn should_run_off_chain_worker() {
 	let node = InternalNode::<Node>::new().unwrap();
@@ -176,7 +159,7 @@ fn should_run_off_chain_worker() {
 	let chain_client = test.rpc::<rpc::ChainClient<Runtime>>();
 	let rpc_client = test.raw_rpc();
 
-	test.compat_runtime().block_on_std(async {
+	test.compat_runtime().borrow_mut().block_on_std(async {
 		// TODO [ToDr] This should be even rawer - allowing to pass JSON call,
 		// which in turn could be collected from the UI.
 		let header = rpc_client
