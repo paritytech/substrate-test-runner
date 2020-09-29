@@ -47,8 +47,7 @@ impl<Node: TestRuntimeRequirements> Deterministic<Node> {
 		let client = self.rpc::<ManualSealClient<<Node::Block as BlockT>::Hash>>();
 
 		for _ in 0..num {
-			self.node
-				.compat_runtime()
+			self.node.compat_runtime()
 				.borrow_mut()
 				.block_on(client.create_block(true, false, None))
 				.expect("block production failed: ");

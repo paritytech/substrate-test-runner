@@ -40,11 +40,11 @@ use sp_core::traits::CryptoExt;
 use parity_scale_codec::Encode;
 use crate::test::externalities::TestExternalities;
 
-mod crypto;
+mod extensions;
 pub mod utils;
 
 use self::{
-	crypto::NonVerifyingCrypto,
+	extensions::ExtensionFactory,
 	utils::{build_config, build_logger, StateProvider}
 };
 
@@ -121,8 +121,7 @@ impl<Node: TestRuntimeRequirements> InternalNode<Node> {
 			block_import,
 		) = Node::create_client_parts(&config)?;
 
-		// register the extension, we would like for the chain to not have any signature verification.
-		client.execution_extensions().register_crypto_extension(Arc::new(NonVerifyingCrypto));
+		client.execution_extensions().set_extensions_factory(Box::new(ExtensionFactory));
 
 		let import_queue =
 			manual_seal::import_queue(Box::new(block_import.clone()), &task_manager.spawn_handle(), None);
