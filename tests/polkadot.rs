@@ -1,13 +1,10 @@
-use frame_system::offchain::{SendSignedTransaction, Signer};
 use futures::compat::Future01CompatExt;
 use pallet_balances::Call as BalancesCall;
-use polkadot_runtime::{Runtime, UncheckedExtrinsic, SignedExtra};
+use polkadot_runtime::{Runtime, SignedExtra};
 use sp_core::crypto::{Pair, AccountId32};
 use sp_keyring::Sr25519Keyring;
-use sp_runtime::{traits::{IdentifyAccount, Extrinsic}, MultiSigner, MultiSignature};
-use substrate_test_runner::{
-	prelude::*, rpc, test, node::{InternalNode, TestRuntimeRequirements},
-};
+use sp_runtime::{traits::IdentifyAccount, MultiSigner};
+use substrate_test_runner::{prelude::*, rpc, test, node::{TestRuntimeRequirements, StateProvider}};
 use sc_service::{TFullClient, new_full_parts, TFullBackend, TaskManager, Configuration, ChainType};
 use parity_scale_codec::alloc::sync::Arc;
 use sc_keystore::KeyStorePtr;
@@ -16,16 +13,11 @@ use sc_consensus_babe::BabeBlockImport;
 use sc_finality_grandpa::GrandpaBlockImport;
 use manual_seal::consensus::{ConsensusDataProvider,	babe::BabeConsensusDataProvider};
 use sp_api::TransactionFor;
-use sp_application_crypto::sr25519;
 use sp_consensus_babe::AuthorityId;
 use sp_keyring::sr25519::Keyring::Alice;
 use polkadot_service::{PolkadotChainSpec, chain_spec::polkadot_development_config_genesis};
 use sp_runtime::generic::Era;
-use parity_scale_codec::Encode;
 use std::str::FromStr;
-use sp_core::{traits::CryptoExt, ed25519};
-use sc_client_api::ExecutorProvider;
-use substrate_test_runner::node::StateProvider;
 
 struct Node;
 
@@ -61,19 +53,19 @@ impl TestRuntimeRequirements for Node {
 		)))
 	}
 
-	fn base_path() -> Option<&'static str> {
-		Some("/home/seun/.local/share/polkadot")
-	}
+	// fn base_path() -> Option<&'static str> {
+	// 	Some("/home/seun/.local/share/polkadot")
+	// }
 
 	fn signed_extras<S>(
-		state: &mut S,
+		state: &S,
 		from: <Self::Runtime as frame_system::Trait>::AccountId,
 	) -> Self::SignedExtension
 	where
 		S: StateProvider
 	{
 		let nonce = state.with_state(|| {
-			frame_system::Module::<Self::Runtime>::account_nonce(from.clone())
+			frame_system::Module::<Self::Runtime>::account_nonce(from)
 		});
 
 		(
@@ -153,8 +145,7 @@ impl TestRuntimeRequirements for Node {
 
 #[test]
 fn should_run_off_chain_worker() {
-	let node = InternalNode::<Node>::new().unwrap();
-	let mut test = test::deterministic(node);
+	let mut test = test::deterministic::<Node>();
 
 	let chain_client = test.rpc::<rpc::ChainClient<Runtime>>();
 	let rpc_client = test.raw_rpc();
@@ -181,7 +172,7 @@ fn should_run_off_chain_worker() {
 #[test]
 fn should_read_and_write_state() {
 	// given
-	let mut test = test::deterministic();
+	let mut test = test::deterministic::<Node>();
 
 	type Balances = pallet_balances::Module<Runtime>;
 
@@ -189,27 +180,28 @@ fn should_read_and_write_state() {
 
 	let alice = Sr25519Keyring::Alice.pair();
 	let alice_account_id = MultiSigner::from(alice.public()).into_account();
+	let account_id = AccountId32::from_str("1rvXMZpAj9nKLQkPFCymyH7Fg3ZyKJhJbrc7UtHbTVhJm1A").unwrap();
 
-	let alice_balance = test.with_state(|| {
-		Balances::free_balance(alice_account_id.clone())
+	let old_balance = test.with_state(|| {
+		Balances::free_balance(account_id.clone())
 	});
 
-	println!("\n\nalice_balance: {:?}\n\n\n", alice_balance);
+	println!("\n\nold_balance: {:?}\n\n\n", old_balance);
 
 	test.send_extrinsic(
-		BalancesCall::transfer(alice_account_id.clone().into(), 7825388000000),
-		AccountId32::from_str("1rvXMZpAj9nKLQkPFCymyH7Fg3ZyKJhJbrc7UtHbTVhJm1A").unwrap()
-	);
+		BalancesCall::transfer(account_id.clone(), 7825388000000),
+		alice_account_id,
+	).unwrap();
 
 	test.produce_blocks(1);
 
-	let alice_balance = test.with_state(|| {
-		Balances::free_balance(alice_account_id)
+	let new_balance = test.with_state(|| {
+		Balances::free_balance(account_id)
 	});
 
-	println!("\n\nalice_balance: {:?}\n\n\n", alice_balance);
+	println!("\n\nnew_balance: {:?}\n\n\n", new_balance);
 
-	assert_eq!(old_alice_balance + 7825388000000, alice_balance);
+	assert_eq!(old_balance + 7825388000000, new_balance);
 	// todo should probably have an api for deleting blocks.
 }
 

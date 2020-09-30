@@ -64,9 +64,9 @@ hex = "0.4.2"
 tokio = { version = "0.2", features = ["full"] }
 
 # Calling RPC
-jsonrpc-core-client = { version = "15.0", features = ["ws"] }
-jsonrpc-core = "15.0"
-jsonrpc-pubsub = "15.0"
+jsonrpc-core-client = { version = "15.1", features = ["ws"] }
+jsonrpc-core = "15.1"
+jsonrpc-pubsub = "15.1"
 tokio-compat = { version = "0.1.6", features = ["rt-full"] }
 url = "1.7"
 primitive-types = "0.7"

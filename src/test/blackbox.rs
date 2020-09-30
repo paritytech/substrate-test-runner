@@ -1,8 +1,7 @@
-use crate::test::externalities::TestExternalities;
 use crate::{
-	node::InternalNode,
 	rpc::{self, RpcExtension},
-	types,
+	types, node::InternalNode,
+	test::externalities::TestExternalities
 };
 use jsonrpc_core_client::{transports::local, RpcChannel};
 use crate::node::TestRuntimeRequirements;
@@ -42,7 +41,7 @@ impl<N: TestRuntimeRequirements> rpc::RpcExtension for BlackBox<N> {
 			BlackBoxNode::External(ref url) => futures::executor::block_on(rpc::connect_ws(&url)).unwrap(),
 			BlackBoxNode::Internal(ref mut node) => {
 				use futures01::Future;
-				let (client, fut) = local::connect::<TClient, _, _, _>(node.rpc_handler());
+				let (client, fut) = local::connect_with_middleware::<TClient, _, _, _>(node.rpc_handler());
 				node.compat_runtime().borrow().spawn(fut.map_err(|_| ()));
 
 				client

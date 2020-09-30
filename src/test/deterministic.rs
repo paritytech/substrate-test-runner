@@ -1,13 +1,10 @@
 use crate::node::TestRuntimeRequirements;
-use crate::test::externalities::TestExternalities;
 use crate::{
 	node::InternalNode,
 	rpc::{self, RpcExtension},
 };
 use jsonrpc_core_client::RpcChannel;
 use manual_seal::rpc::ManualSealClient;
-use sp_externalities::{Externalities, ExternalitiesExt};
-use sp_keyring::sr25519::Keyring;
 use sp_runtime::traits::Block as BlockT;
 use std::ops::{Deref, DerefMut};
 

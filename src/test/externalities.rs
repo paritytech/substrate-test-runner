@@ -1,6 +1,5 @@
 use crate::rpc;
 use futures01::Future;
-use sp_core::offchain::TransactionPool;
 use sp_externalities::Extensions;
 use sp_storage::{ChildInfo, StorageKey, TrackedStorageKey};
 use std::any::{Any, TypeId};

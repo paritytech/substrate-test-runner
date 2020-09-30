@@ -1,49 +1,38 @@
-use std::io::Write;
-use std::marker::PhantomData;
-use std::sync::Arc;
-use std::fmt;
+use std::{
+	cell::RefCell,
+	sync::Arc,
+};
 
-use futures::{channel::mpsc, FutureExt, Sink, SinkExt};
+use futures::{channel::mpsc, compat::Future01CompatExt, FutureExt};
 use jsonrpc_core::MetaIoHandler;
 use jsonrpc_core_client::{transports::local, RpcChannel};
-use manual_seal::{
-	run_manual_seal, ManualSealParams, consensus::ConsensusDataProvider,
-};
-use futures::{compat::Future01CompatExt};
+use manual_seal::{run_manual_seal, ManualSealParams, consensus::ConsensusDataProvider};
 use sc_cli::build_runtime;
-use sc_client_api::{backend::Backend, execution_extensions::ExecutionStrategies, ExecutorProvider};
+use sc_client_api::{backend::Backend, ExecutorProvider};
 use sc_executor::NativeExecutionDispatch;
-use sc_informant::OutputFormat;
-use sc_network::{config::TransportConfig, multiaddr};
 use sc_service::{
-	build_network,
-	config::{KeystoreConfig, NetworkConfiguration, WasmExecutionMethod},
-	spawn_tasks, BasePath, BuildNetworkParams, ChainSpec, Configuration, DatabaseConfig, Role,
-	SpawnTasksParams, TFullBackend, TFullClient, TaskExecutor, TaskManager, TaskType,
+	build_network, spawn_tasks, BuildNetworkParams, ChainSpec, Configuration,
+	SpawnTasksParams, TFullBackend, TFullClient, TaskManager, TaskType,
 };
 use sc_transaction_pool::BasicPool;
 use sp_api::{ApiErrorExt, ApiExt, ConstructRuntimeApi, Core, Metadata, TransactionFor};
 use sp_block_builder::BlockBuilder;
 use sp_inherents::InherentDataProviders;
-use sp_keyring::Sr25519Keyring;
 use sp_offchain::OffchainWorkerApi;
-use sp_runtime::{traits::{Block as BlockT, SignedExtension}, generic::UncheckedExtrinsic};
+use sp_runtime::{traits::{Block as BlockT, SignedExtension}, generic::UncheckedExtrinsic, MultiSignature};
 use sp_session::SessionKeys;
 use sp_transaction_pool::runtime_api::TaggedTransactionQueue;
 use sc_keystore::KeyStorePtr;
 use sp_consensus::{BlockImport, SelectChain};
-use sp_runtime::sp_std::cell::RefCell;
-use crate::rpc;
-use sp_core::{ed25519, sr25519, ecdsa};
 use sp_runtime::traits::Extrinsic;
-use sp_core::traits::CryptoExt;
 use parity_scale_codec::Encode;
-use crate::test::externalities::TestExternalities;
+
+use crate::{rpc, test::externalities::TestExternalities};
 
 mod extensions;
 pub mod utils;
 
-use self::{
+pub use self::{
 	extensions::ExtensionFactory,
 	utils::{build_config, build_logger, StateProvider}
 };
@@ -54,23 +43,16 @@ use self::{
 pub struct InternalNode<Node: TestRuntimeRequirements> {
 	/// rpc handler for communicating with the node over rpc.
 	rpc_handler: Arc<MetaIoHandler<sc_rpc::Metadata, sc_rpc_server::RpcMiddleware>>,
-
 	/// tokio-compat runtime
 	_compat_runtime: RefCell<tokio_compat::runtime::Runtime>,
-
-	///Stream of log lines
+	/// Stream of log lines
 	log_stream: futures::channel::mpsc::UnboundedReceiver<String>,
-
 	/// node tokio runtime
 	_runtime: tokio::runtime::Runtime,
-
 	/// handle to the running node.
 	_task_manager: Option<TaskManager>,
-
-	/// externalities
+	/// Externalities
 	externalities: RefCell<TestExternalities<Node>>,
-
-	_phantom: PhantomData<Node>,
 }
 
 impl<Node: TestRuntimeRequirements> InternalNode<Node> {
@@ -83,14 +65,14 @@ impl<Node: TestRuntimeRequirements> InternalNode<Node> {
 					TFullClient<Node::Block, Node::RuntimeApi, Node::Executor>
 				>
 			>::RuntimeApi: Core<Node::Block> + Metadata<Node::Block>
-			+ OffchainWorkerApi<Node::Block> + SessionKeys<Node::Block>
-			+ TaggedTransactionQueue<Node::Block> + BlockBuilder<Node::Block>
-			+ ApiErrorExt<Error=sp_blockchain::Error>
-			+ ApiExt<
-				Node::Block,
-				StateBackend =
-				<TFullBackend<Node::Block> as Backend<Node::Block>>::State,
-			>,
+				+ OffchainWorkerApi<Node::Block> + SessionKeys<Node::Block>
+				+ TaggedTransactionQueue<Node::Block> + BlockBuilder<Node::Block>
+				+ ApiErrorExt<Error=sp_blockchain::Error>
+				+ ApiExt<
+					Node::Block,
+					StateBackend =
+					<TFullBackend<Node::Block> as Backend<Node::Block>>::State,
+				>,
 	{
 		let compat_runtime = tokio_compat::runtime::Runtime::new().unwrap();
 		let tokio_runtime = build_runtime().unwrap();
@@ -206,10 +188,8 @@ impl<Node: TestRuntimeRequirements> InternalNode<Node> {
 
 		network_starter.start_network();
 		let rpc_handler = rpc_handlers.io_handler();
-		let (client, fut) = local::connect::<
-			rpc::StateClient<Node::Runtime>,
-			Arc<MetaIoHandler<sc_rpc::Metadata, sc_rpc_server::RpcMiddleware>>,
-			_, _>(rpc_handler.clone());
+		let (client, fut) =
+			local::connect_with_middleware::<rpc::StateClient<Node::Runtime>, _, _, _>(rpc_handler.clone());
 
 		use futures01::Future;
 		compat_runtime.spawn(fut.map_err(|_| ()));
@@ -217,10 +197,9 @@ impl<Node: TestRuntimeRequirements> InternalNode<Node> {
 		Ok(Self {
 			rpc_handler,
 			_task_manager: Some(task_manager),
-			_phantom: PhantomData,
 			_runtime: tokio_runtime,
 			_compat_runtime: RefCell::new(compat_runtime),
-			externalities: TestExternalities::new(client),
+			externalities: RefCell::new(TestExternalities::new(client)),
 			log_stream,
 		})
 	}
@@ -235,7 +214,7 @@ impl<Node: TestRuntimeRequirements> InternalNode<Node> {
 		&self,
 		call: impl Into<<Node::Runtime as frame_system::Trait>::Call>,
 		from: <Node::Runtime as frame_system::Trait>::AccountId,
-	)
+	) -> Result<<Node::Runtime as frame_system::Trait>::Hash, jsonrpc_core_client::RpcError>
 		where
 			<Node::Runtime as frame_system::Trait>::AccountId: Encode,
 			<Node::Runtime as frame_system::Trait>::Call: Encode,
@@ -245,16 +224,16 @@ impl<Node: TestRuntimeRequirements> InternalNode<Node> {
 		let ext = UncheckedExtrinsic::<
 			<Node::Runtime as frame_system::Trait>::AccountId,
 			<Node::Runtime as frame_system::Trait>::Call,
-			ed25519::Signature,
+			MultiSignature,
 			Node::SignedExtension,
-		>::new(call.into(), signed_data).unwrap();
+		>::new(call.into(), signed_data)
+			.expect("UncheckedExtrinsic::new() always returns Some");
 		let rpc_client = self.rpc_client::<rpc::AuthorClient<Node::Runtime>>();
 
-		self.compat_runtime().borrow_mut().block_on_std(async move {
-			let result = rpc_client.submit_extrinsic(ext.encode().into()).compat().await;
-			matches!(result, Ok(_));
-			log::info!("successfully submitted extrinsic to pool with hash: {}", result.unwrap());
-		});
+		self.compat_runtime().borrow_mut()
+			.block_on_std(async move {
+				rpc_client.submit_extrinsic(ext.encode().into()).compat().await
+			})
 	}
 
 	/// create a new jsonrpc client using the jsonrpc-core-client local transport
@@ -264,10 +243,7 @@ impl<Node: TestRuntimeRequirements> InternalNode<Node> {
 	{
 		use futures01::Future;
 		let rpc_handler = self.rpc_handler.clone();
-		let (client, fut) = local::connect::<
-			C,
-			Arc<MetaIoHandler<sc_rpc::Metadata, sc_rpc_server::RpcMiddleware>>,
-			_, _>(rpc_handler);
+		let (client, fut) = local::connect_with_middleware::<C, _, _, _>(rpc_handler);
 		self._compat_runtime.borrow().spawn(fut.map_err(|_| ()));
 		client
 	}
