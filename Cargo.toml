@@ -41,6 +41,7 @@ sp-timestamp = { git = "https://github.com/paritytech/substrate.git", branch = "
 sp-keyring = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 sp-externalities = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 sp-storage = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-state-machine = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 
 # pallets
 frame-system = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }

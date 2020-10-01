@@ -8,14 +8,14 @@ use jsonrpc_core::MetaIoHandler;
 use jsonrpc_core_client::{transports::local, RpcChannel};
 use manual_seal::{run_manual_seal, ManualSealParams, consensus::ConsensusDataProvider};
 use sc_cli::build_runtime;
-use sc_client_api::{backend::Backend, ExecutorProvider};
+use sc_client_api::{backend::Backend, ExecutorProvider, backend, CallExecutor};
 use sc_executor::NativeExecutionDispatch;
-use sc_service::{
-	build_network, spawn_tasks, BuildNetworkParams, ChainSpec, Configuration,
-	SpawnTasksParams, TFullBackend, TFullClient, TaskManager, TaskType,
-};
+use sc_service::{build_network, spawn_tasks, BuildNetworkParams, ChainSpec, Configuration, SpawnTasksParams, TFullBackend, TFullClient, TaskManager, TaskType, TFullCallExecutor};
 use sc_transaction_pool::BasicPool;
-use sp_api::{ApiErrorExt, ApiExt, ConstructRuntimeApi, Core, Metadata, TransactionFor};
+use sp_api::{
+	ApiErrorExt, ApiExt, ConstructRuntimeApi, Core, Metadata,
+	TransactionFor, OverlayedChanges, StorageTransactionCache,
+};
 use sp_block_builder::BlockBuilder;
 use sp_inherents::InherentDataProviders;
 use sp_offchain::OffchainWorkerApi;
@@ -26,8 +26,9 @@ use sc_keystore::KeyStorePtr;
 use sp_consensus::{BlockImport, SelectChain};
 use sp_runtime::traits::Extrinsic;
 use parity_scale_codec::Encode;
+use sp_state_machine::Ext;
 
-use crate::{rpc, test::externalities::TestExternalities};
+use crate::rpc;
 
 mod extensions;
 pub mod utils;
@@ -36,6 +37,10 @@ pub use self::{
 	extensions::ExtensionFactory,
 	utils::{build_config, build_logger, StateProvider}
 };
+use sp_core::offchain::storage::OffchainOverlayedChanges;
+use sp_core::ExecutionContext;
+use sp_blockchain::HeaderBackend;
+use sp_runtime::generic::BlockId;
 
 /// This holds a reference to a running node on another thread,
 /// the node process is dropped when this struct is dropped
@@ -51,8 +56,10 @@ pub struct InternalNode<Node: TestRuntimeRequirements> {
 	_runtime: tokio::runtime::Runtime,
 	/// handle to the running node.
 	_task_manager: Option<TaskManager>,
-	/// Externalities
-	externalities: RefCell<TestExternalities<Node>>,
+	/// client instance
+	client: Arc<TFullClient<Node::Block, Node::RuntimeApi, Node::Executor>>,
+	/// backend type.
+	backend: Arc<TFullBackend<Node::Block>>,
 }
 
 impl<Node: TestRuntimeRequirements> InternalNode<Node> {
@@ -173,7 +180,7 @@ impl<Node: TestRuntimeRequirements> InternalNode<Node> {
 		let authorship_future = run_manual_seal(ManualSealParams {
 			block_import,
 			env,
-			client,
+			client: client.clone(),
 			pool: transaction_pool.pool().clone(),
 			commands_stream,
 			select_chain,
@@ -188,18 +195,14 @@ impl<Node: TestRuntimeRequirements> InternalNode<Node> {
 
 		network_starter.start_network();
 		let rpc_handler = rpc_handlers.io_handler();
-		let (client, fut) =
-			local::connect_with_middleware::<rpc::StateClient<Node::Runtime>, _, _, _>(rpc_handler.clone());
-
-		use futures01::Future;
-		compat_runtime.spawn(fut.map_err(|_| ()));
 
 		Ok(Self {
 			rpc_handler,
 			_task_manager: Some(task_manager),
 			_runtime: tokio_runtime,
 			_compat_runtime: RefCell::new(compat_runtime),
-			externalities: RefCell::new(TestExternalities::new(client)),
+			client,
+			backend,
 			log_stream,
 		})
 	}
@@ -272,9 +275,33 @@ impl<Node: TestRuntimeRequirements> Drop for InternalNode<Node> {
 	}
 }
 
-impl<Node: TestRuntimeRequirements> StateProvider for InternalNode<Node> {
+impl<Node: TestRuntimeRequirements> StateProvider for InternalNode<Node>
+	where
+		<TFullCallExecutor<Node::Block, Node::Executor> as CallExecutor<Node::Block>>::Error: std::fmt::Debug,
+{
 	fn with_state<R>(&self, closure: impl FnOnce() -> R) -> R {
-		self.externalities.borrow_mut().execute_with(closure)
+		let id = BlockId::Hash(self.client.info().best_hash);
+		let mut offchain_overlay = OffchainOverlayedChanges::disabled();
+		let mut overlay = OverlayedChanges::default();
+		let changes_trie = backend::changes_tries_state_at_block(
+			&id, self.backend.changes_trie_storage()
+		).unwrap();
+		let mut cache = StorageTransactionCache::<
+			Node::Block,
+			<TFullBackend<Node::Block> as Backend<Node::Block>>::State
+		>::default();
+		let mut extensions = self.client.execution_extensions()
+			.extensions(&id, ExecutionContext::BlockConstruction);
+		let state_backend = self.backend.state_at(id).unwrap();
+		let mut ext = Ext::new(
+			&mut overlay,
+			&mut offchain_overlay,
+			&mut cache,
+			&state_backend,
+			changes_trie.clone(),
+			Some(&mut extensions),
+		);
+		sp_externalities::set_and_run_with_externalities(&mut ext, closure)
 	}
 }
 
