@@ -1,5 +1,7 @@
 use futures::compat::Future01CompatExt;
 use pallet_balances::Call as BalancesCall;
+use frame_system::Call as SystemCall;
+use pallet_democracy::Call as DemocracyCall;
 use polkadot_runtime::{Runtime, SignedExtra};
 use sp_core::crypto::{Pair, AccountId32};
 use sp_keyring::Sr25519Keyring;
@@ -18,6 +20,9 @@ use sp_keyring::sr25519::Keyring::Alice;
 use polkadot_service::{PolkadotChainSpec, chain_spec::polkadot_development_config_genesis};
 use sp_runtime::generic::Era;
 use std::str::FromStr;
+
+use primitive_types::H256;
+use parity_scale_codec::Encode;
 
 struct Node;
 
@@ -53,9 +58,9 @@ impl TestRuntimeRequirements for Node {
 		)))
 	}
 
-	// fn base_path() -> Option<&'static str> {
-	// 	Some("/home/seun/.local/share/polkadot")
-	// }
+	fn base_path() -> Option<&'static str> {
+		Some("/home/apopiak/backup_db/")
+	}
 
 	fn signed_extras<S>(
 		state: &S,
@@ -181,6 +186,7 @@ fn should_read_and_write_state() {
 	let alice = Sr25519Keyring::Alice.pair();
 	let alice_account_id = MultiSigner::from(alice.public()).into_account();
 	let account_id = AccountId32::from_str("1rvXMZpAj9nKLQkPFCymyH7Fg3ZyKJhJbrc7UtHbTVhJm1A").unwrap();
+	let whale1 = AccountId32::from_str("12dfEn1GycUmHtfEDW3BuQYzsMyUR1PqUPH2pyEikYeUX59o").unwrap();
 
 	let old_balance = test.with_state(|| {
 		Balances::free_balance(account_id.clone())
@@ -188,10 +194,30 @@ fn should_read_and_write_state() {
 
 	println!("\n\nold_balance: {:?}\n\n\n", old_balance);
 
-	test.send_extrinsic(
-		BalancesCall::transfer(account_id.clone(), 7825388000000),
-		alice_account_id,
-	).unwrap();
+	let bytes = include_bytes!("/home/apopiak/remote-builds/polkadot/target/release/wbuild/polkadot-runtime/polkadot_runtime.compact.wasm").to_vec();
+	// test.send_extrinsic(SystemCall::<Runtime>::set_code(bytes), account_id);
+	// let proposal = SystemCall::<Runtime>::set_code(bytes).encode();
+
+	test.with_state(|| {
+		use sp_core::storage::well_known_keys;
+		frame_support::storage::unhashed::put_raw(well_known_keys::CODE, &bytes);
+
+		use frame_support::StorageValue;
+		frame_system::LastRuntimeUpgrade::set(None);
+	});
+	
+	// test.send_extrinsic(
+	// 	DemocracyCall::note_preimage(proposal.clone()),
+	// 	account_id.clone(),
+	// ).unwrap();
+
+	// let hash = sp_core::hashing::blake2_256(&proposal);
+	
+	// let deposit = 1_000_000_000_000;
+	// test.send_extrinsic(
+	// 	DemocracyCall::propose(H256::from(hash), deposit),
+	// 	account_id.clone(),
+	// ).unwrap();
 
 	test.produce_blocks(1);
 
