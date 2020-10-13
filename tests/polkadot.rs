@@ -122,7 +122,7 @@ impl TestRuntimeRequirements for Node {
 
 		let consensus_data_provider = BabeConsensusDataProvider::new(
 			client.clone(),
-			keystore,
+			keystore.sync_keystore(),
 			&inherent_providers,
 			babe_link.epoch_changes().clone(),
 			vec![(AuthorityId::from(Alice.public()), 1000)],
@@ -132,7 +132,7 @@ impl TestRuntimeRequirements for Node {
 		Ok((
 			client,
 			backend,
-			keystore,
+			keystore.sync_keystore(),
 			task_manager,
 			inherent_providers,
 			Some(Box::new(consensus_data_provider)),
