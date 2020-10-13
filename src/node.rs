@@ -1,32 +1,35 @@
-use std::{
-	cell::RefCell,
-	sync::Arc,
-};
+use std::{cell::RefCell, sync::Arc};
 
 use futures::{channel::mpsc, compat::Future01CompatExt, FutureExt};
 use jsonrpc_core::MetaIoHandler;
 use jsonrpc_core_client::{transports::local, RpcChannel};
-use manual_seal::{run_manual_seal, ManualSealParams, consensus::ConsensusDataProvider};
+use manual_seal::{consensus::ConsensusDataProvider, run_manual_seal, ManualSealParams};
+use parity_scale_codec::Encode;
 use sc_cli::build_runtime;
-use sc_client_api::{backend::Backend, ExecutorProvider, backend, CallExecutor};
+use sc_client_api::{backend, backend::Backend, CallExecutor, ExecutorProvider};
 use sc_executor::NativeExecutionDispatch;
-use sc_service::{build_network, spawn_tasks, BuildNetworkParams, ChainSpec, Configuration, SpawnTasksParams, TFullBackend, TFullClient, TaskManager, TaskType, TFullCallExecutor};
+use sc_service::{
+	build_network, spawn_tasks, BuildNetworkParams, ChainSpec, Configuration, SpawnTasksParams, TFullBackend,
+	TFullCallExecutor, TFullClient, TaskManager, TaskType,
+};
 use sc_transaction_pool::BasicPool;
 use sp_api::{
-	ApiErrorExt, ApiExt, ConstructRuntimeApi, Core, Metadata,
-	TransactionFor, OverlayedChanges, StorageTransactionCache,
+	ApiErrorExt, ApiExt, ConstructRuntimeApi, Core, Metadata, OverlayedChanges, StorageTransactionCache, TransactionFor,
 };
 use sp_block_builder::BlockBuilder;
-use sp_inherents::InherentDataProviders;
-use sp_offchain::OffchainWorkerApi;
-use sp_runtime::{traits::{Block as BlockT, SignedExtension}, generic::UncheckedExtrinsic, MultiSignature};
-use sp_session::SessionKeys;
-use sp_transaction_pool::runtime_api::TaggedTransactionQueue;
-use sc_keystore::KeyStorePtr;
 use sp_consensus::{BlockImport, SelectChain};
+use sp_inherents::InherentDataProviders;
+use sp_keystore::SyncCryptoStorePtr;
+use sp_offchain::OffchainWorkerApi;
 use sp_runtime::traits::Extrinsic;
-use parity_scale_codec::Encode;
+use sp_runtime::{
+	generic::UncheckedExtrinsic,
+	traits::{Block as BlockT, SignedExtension},
+	MultiSignature,
+};
+use sp_session::SessionKeys;
 use sp_state_machine::Ext;
+use sp_transaction_pool::runtime_api::TaggedTransactionQueue;
 
 use crate::rpc;
 
@@ -35,11 +38,11 @@ pub mod utils;
 
 pub use self::{
 	extensions::ExtensionFactory,
-	utils::{build_config, build_logger, StateProvider}
+	utils::{build_config, build_logger, StateProvider},
 };
+use sp_blockchain::HeaderBackend;
 use sp_core::offchain::storage::OffchainOverlayedChanges;
 use sp_core::ExecutionContext;
-use sp_blockchain::HeaderBackend;
 use sp_runtime::generic::BlockId;
 
 /// This holds a reference to a running node on another thread,
@@ -65,21 +68,18 @@ pub struct InternalNode<Node: TestRuntimeRequirements> {
 impl<Node: TestRuntimeRequirements> InternalNode<Node> {
 	/// Starts a node with the manual-seal authorship,
 	pub fn new() -> Result<Self, sc_service::Error>
-		where
-			<Node::RuntimeApi as
-				ConstructRuntimeApi<
-					Node::Block,
-					TFullClient<Node::Block, Node::RuntimeApi, Node::Executor>
-				>
-			>::RuntimeApi: Core<Node::Block> + Metadata<Node::Block>
-				+ OffchainWorkerApi<Node::Block> + SessionKeys<Node::Block>
-				+ TaggedTransactionQueue<Node::Block> + BlockBuilder<Node::Block>
-				+ ApiErrorExt<Error=sp_blockchain::Error>
-				+ ApiExt<
-					Node::Block,
-					StateBackend =
-					<TFullBackend<Node::Block> as Backend<Node::Block>>::State,
-				>,
+	where
+		<Node::RuntimeApi as ConstructRuntimeApi<
+			Node::Block,
+			TFullClient<Node::Block, Node::RuntimeApi, Node::Executor>,
+		>>::RuntimeApi: Core<Node::Block>
+			+ Metadata<Node::Block>
+			+ OffchainWorkerApi<Node::Block>
+			+ SessionKeys<Node::Block>
+			+ TaggedTransactionQueue<Node::Block>
+			+ BlockBuilder<Node::Block>
+			+ ApiErrorExt<Error = sp_blockchain::Error>
+			+ ApiExt<Node::Block, StateBackend = <TFullBackend<Node::Block> as Backend<Node::Block>>::State>,
 	{
 		let compat_runtime = tokio_compat::runtime::Runtime::new().unwrap();
 		let tokio_runtime = build_runtime().unwrap();
@@ -110,7 +110,9 @@ impl<Node: TestRuntimeRequirements> InternalNode<Node> {
 			block_import,
 		) = Node::create_client_parts(&config)?;
 
-		client.execution_extensions().set_extensions_factory(Box::new(ExtensionFactory));
+		client
+			.execution_extensions()
+			.set_extensions_factory(Box::new(ExtensionFactory));
 
 		let import_queue =
 			manual_seal::import_queue(Box::new(block_import.clone()), &task_manager.spawn_handle(), None);
@@ -218,9 +220,9 @@ impl<Node: TestRuntimeRequirements> InternalNode<Node> {
 		call: impl Into<<Node::Runtime as frame_system::Trait>::Call>,
 		from: <Node::Runtime as frame_system::Trait>::AccountId,
 	) -> Result<<Node::Runtime as frame_system::Trait>::Hash, jsonrpc_core_client::RpcError>
-		where
-			<Node::Runtime as frame_system::Trait>::AccountId: Encode,
-			<Node::Runtime as frame_system::Trait>::Call: Encode,
+	where
+		<Node::Runtime as frame_system::Trait>::AccountId: Encode,
+		<Node::Runtime as frame_system::Trait>::Call: Encode,
 	{
 		let extra = Node::signed_extras::<Self>(&self, from.clone());
 		let signed_data = Some((from, Default::default(), extra));
@@ -230,13 +232,12 @@ impl<Node: TestRuntimeRequirements> InternalNode<Node> {
 			MultiSignature,
 			Node::SignedExtension,
 		>::new(call.into(), signed_data)
-			.expect("UncheckedExtrinsic::new() always returns Some");
+		.expect("UncheckedExtrinsic::new() always returns Some");
 		let rpc_client = self.rpc_client::<rpc::AuthorClient<Node::Runtime>>();
 
-		self.compat_runtime().borrow_mut()
-			.block_on_std(async move {
-				rpc_client.submit_extrinsic(ext.encode().into()).compat().await
-			})
+		self.compat_runtime()
+			.borrow_mut()
+			.block_on_std(async move { rpc_client.submit_extrinsic(ext.encode().into()).compat().await })
 	}
 
 	/// create a new jsonrpc client using the jsonrpc-core-client local transport
@@ -276,21 +277,21 @@ impl<Node: TestRuntimeRequirements> Drop for InternalNode<Node> {
 }
 
 impl<Node: TestRuntimeRequirements> StateProvider for InternalNode<Node>
-	where
-		<TFullCallExecutor<Node::Block, Node::Executor> as CallExecutor<Node::Block>>::Error: std::fmt::Debug,
+where
+	<TFullCallExecutor<Node::Block, Node::Executor> as CallExecutor<Node::Block>>::Error: std::fmt::Debug,
 {
 	fn with_state<R>(&self, closure: impl FnOnce() -> R) -> R {
 		let id = BlockId::Hash(self.client.info().best_hash);
 		let mut offchain_overlay = OffchainOverlayedChanges::disabled();
 		let mut overlay = OverlayedChanges::default();
-		let changes_trie = backend::changes_tries_state_at_block(
-			&id, self.backend.changes_trie_storage()
-		).unwrap();
+		let changes_trie = backend::changes_tries_state_at_block(&id, self.backend.changes_trie_storage()).unwrap();
 		let mut cache = StorageTransactionCache::<
 			Node::Block,
-			<TFullBackend<Node::Block> as Backend<Node::Block>>::State
+			<TFullBackend<Node::Block> as Backend<Node::Block>>::State,
 		>::default();
-		let mut extensions = self.client.execution_extensions()
+		let mut extensions = self
+			.client
+			.execution_extensions()
 			.extensions(&id, ExecutionContext::BlockConstruction);
 		let state_backend = self.backend.state_at(id).unwrap();
 		let mut ext = Ext::new(
@@ -326,14 +327,13 @@ pub trait TestRuntimeRequirements: Sized {
 	type SelectChain: SelectChain<Self::Block> + 'static;
 
 	/// Block import type.
-	type BlockImport: Send + Sync + Clone
+	type BlockImport: Send
+		+ Sync
+		+ Clone
 		+ BlockImport<
 			Self::Block,
 			Error = sp_consensus::Error,
-			Transaction = TransactionFor<
-				TFullClient<Self::Block, Self::RuntimeApi, Self::Executor>,
-				Self::Block
-			>
+			Transaction = TransactionFor<TFullClient<Self::Block, Self::RuntimeApi, Self::Executor>, Self::Block>,
 		> + 'static;
 
 	type SignedExtension: SignedExtension;
@@ -347,34 +347,35 @@ pub trait TestRuntimeRequirements: Sized {
 	}
 
 	/// Signed extras.
-	fn signed_extras<S>(
-		state: &S,
-		from: <Self::Runtime as frame_system::Trait>::AccountId,
-	) -> Self::SignedExtension
-		where
-			S: StateProvider;
+	fn signed_extras<S>(state: &S, from: <Self::Runtime as frame_system::Trait>::AccountId) -> Self::SignedExtension
+	where
+		S: StateProvider;
 
 	/// Attempt to create client parts, including blockimport,
 	/// selectchain strategy and consensus data provider.
-	fn create_client_parts(config: &Configuration) -> Result<
+	fn create_client_parts(
+		config: &Configuration,
+	) -> Result<
 		(
 			Arc<TFullClient<Self::Block, Self::RuntimeApi, Self::Executor>>,
 			Arc<TFullBackend<Self::Block>>,
-			KeyStorePtr,
+			SyncCryptoStorePtr,
 			TaskManager,
 			InherentDataProviders,
-			Option<Box<
-				dyn ConsensusDataProvider<
-					Self::Block,
-					Transaction = TransactionFor<
-						TFullClient<Self::Block, Self::RuntimeApi, Self::Executor>,
-						Self::Block
+			Option<
+				Box<
+					dyn ConsensusDataProvider<
+						Self::Block,
+						Transaction = TransactionFor<
+							TFullClient<Self::Block, Self::RuntimeApi, Self::Executor>,
+							Self::Block,
+						>,
 					>,
-				>
-			>>,
+				>,
+			>,
 			Self::SelectChain,
-			Self::BlockImport
+			Self::BlockImport,
 		),
-		sc_service::Error
+		sc_service::Error,
 	>;
 }

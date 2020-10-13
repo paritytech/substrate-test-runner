@@ -1,23 +1,27 @@
 use futures::compat::Future01CompatExt;
+use manual_seal::consensus::{babe::BabeConsensusDataProvider, ConsensusDataProvider};
 use pallet_balances::Call as BalancesCall;
-use polkadot_runtime::{Runtime, SignedExtra};
-use sp_core::crypto::{Pair, AccountId32};
-use sp_keyring::Sr25519Keyring;
-use sp_runtime::{traits::IdentifyAccount, MultiSigner};
-use substrate_test_runner::{prelude::*, rpc, test, node::{TestRuntimeRequirements, StateProvider}};
-use sc_service::{TFullClient, new_full_parts, TFullBackend, TaskManager, Configuration, ChainType};
 use parity_scale_codec::alloc::sync::Arc;
-use sc_keystore::KeyStorePtr;
-use sp_inherents::InherentDataProviders;
+use polkadot_runtime::{Runtime, SignedExtra};
+use polkadot_service::{chain_spec::polkadot_development_config_genesis, PolkadotChainSpec};
 use sc_consensus_babe::BabeBlockImport;
 use sc_finality_grandpa::GrandpaBlockImport;
-use manual_seal::consensus::{ConsensusDataProvider,	babe::BabeConsensusDataProvider};
+use sc_service::{new_full_parts, ChainType, Configuration, TFullBackend, TFullClient, TaskManager};
 use sp_api::TransactionFor;
 use sp_consensus_babe::AuthorityId;
+use sp_core::crypto::{AccountId32, Pair};
+use sp_inherents::InherentDataProviders;
 use sp_keyring::sr25519::Keyring::Alice;
-use polkadot_service::{PolkadotChainSpec, chain_spec::polkadot_development_config_genesis};
+use sp_keyring::Sr25519Keyring;
+use sp_keystore::SyncCryptoStorePtr;
 use sp_runtime::generic::Era;
+use sp_runtime::{traits::IdentifyAccount, MultiSigner};
 use std::str::FromStr;
+use substrate_test_runner::{
+	node::{StateProvider, TestRuntimeRequirements},
+	prelude::*,
+	rpc, test,
+};
 
 struct Node;
 
@@ -57,16 +61,11 @@ impl TestRuntimeRequirements for Node {
 	// 	Some("/home/seun/.local/share/polkadot")
 	// }
 
-	fn signed_extras<S>(
-		state: &S,
-		from: <Self::Runtime as frame_system::Trait>::AccountId,
-	) -> Self::SignedExtension
+	fn signed_extras<S>(state: &S, from: <Self::Runtime as frame_system::Trait>::AccountId) -> Self::SignedExtension
 	where
-		S: StateProvider
+		S: StateProvider,
 	{
-		let nonce = state.with_state(|| {
-			frame_system::Module::<Self::Runtime>::account_nonce(from)
-		});
+		let nonce = state.with_state(|| frame_system::Module::<Self::Runtime>::account_nonce(from));
 
 		(
 			frame_system::CheckSpecVersion::<Self::Runtime>::new(),
@@ -80,33 +79,33 @@ impl TestRuntimeRequirements for Node {
 		)
 	}
 
-	fn create_client_parts(config: &Configuration) -> Result<
+	fn create_client_parts(
+		config: &Configuration,
+	) -> Result<
 		(
 			Arc<TFullClient<Self::Block, Self::RuntimeApi, Self::Executor>>,
 			Arc<TFullBackend<Self::Block>>,
-			KeyStorePtr,
+			SyncCryptoStorePtr,
 			TaskManager,
 			InherentDataProviders,
-			Option<Box<
-				dyn ConsensusDataProvider<
-					Self::Block,
-					Transaction = TransactionFor<
-						TFullClient<Self::Block, Self::RuntimeApi, Self::Executor>,
-						Self::Block
+			Option<
+				Box<
+					dyn ConsensusDataProvider<
+						Self::Block,
+						Transaction = TransactionFor<
+							TFullClient<Self::Block, Self::RuntimeApi, Self::Executor>,
+							Self::Block,
+						>,
 					>,
-				>
-			>>,
+				>,
+			>,
 			Self::SelectChain,
-			Self::BlockImport
+			Self::BlockImport,
 		),
-		sc_service::Error
+		sc_service::Error,
 	> {
-		let (
-			client,
-			backend,
-			keystore,
-			task_manager,
-		) = new_full_parts::<Self::Block, Self::RuntimeApi, Self::Executor>(config)?;
+		let (client, backend, keystore, task_manager) =
+			new_full_parts::<Self::Block, Self::RuntimeApi, Self::Executor>(config)?;
 		let client = Arc::new(client);
 
 		let inherent_providers = InherentDataProviders::new();
@@ -123,10 +122,10 @@ impl TestRuntimeRequirements for Node {
 
 		let consensus_data_provider = BabeConsensusDataProvider::new(
 			client.clone(),
-			keystore.clone(),
+			keystore,
 			&inherent_providers,
 			babe_link.epoch_changes().clone(),
-			vec![(AuthorityId::from(Alice.public()), 1000)]
+			vec![(AuthorityId::from(Alice.public()), 1000)],
 		)
 		.expect("failed to create ConsensusDataProvider");
 
@@ -138,7 +137,7 @@ impl TestRuntimeRequirements for Node {
 			inherent_providers,
 			Some(Box::new(consensus_data_provider)),
 			select_chain,
-			block_import
+			block_import,
 		))
 	}
 }
@@ -163,7 +162,6 @@ fn should_run_off_chain_worker() {
 		println!("{:?}", header);
 	});
 
-
 	test.produce_blocks(15);
 
 	test.assert_log_line("best = true");
@@ -182,28 +180,28 @@ fn should_read_and_write_state() {
 	let alice_account_id = MultiSigner::from(alice.public()).into_account();
 	let account_id = AccountId32::from_str("1rvXMZpAj9nKLQkPFCymyH7Fg3ZyKJhJbrc7UtHbTVhJm1A").unwrap();
 
-	let old_balance = test.with_state(|| {
-		Balances::free_balance(account_id.clone())
-	});
+	let old_balance = test.with_state(|| Balances::free_balance(account_id.clone()));
 
 	println!("\n\nold_balance: {:?}\n\n\n", old_balance);
 
 	test.send_extrinsic(
 		BalancesCall::transfer(account_id.clone(), 7825388000000),
 		alice_account_id,
-	).unwrap();
+	)
+	.unwrap();
 
 	test.produce_blocks(1);
 
-	let new_balance = test.with_state(|| {
-		Balances::free_balance(account_id)
-	});
+	let new_balance = test.with_state(|| Balances::free_balance(account_id));
 
 	println!("\n\nnew_balance: {:?}\n\n\n", new_balance);
 
 	assert_eq!(old_balance + 7825388000000, new_balance);
 	// todo should probably have an api for deleting blocks.
 }
+
+#[test]
+fn elections_migration() {}
 
 #[test]
 fn external_black_box() {

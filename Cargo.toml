@@ -6,48 +6,49 @@ edition = "2018"
 
 [dependencies]
 # client deps
-sc-executor = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sc-service = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sc-informant = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sc-network = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sc-cli = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sc-rpc-api = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sc-basic-authorship = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sc-rpc = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sc-consensus = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sc-finality-grandpa = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sc-consensus-babe = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sc-transaction-pool = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sc-client-db = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sc-client-api = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sc-rpc-server = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-manual-seal = { package = "sc-consensus-manual-seal", git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-executor = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sc-service = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sc-informant = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sc-network = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sc-cli = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sc-rpc-api = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sc-basic-authorship = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sc-rpc = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sc-consensus = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sc-finality-grandpa = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sc-consensus-babe = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sc-transaction-pool = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sc-client-db = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sc-client-api = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sc-rpc-server = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+manual-seal = { package = "sc-consensus-manual-seal", git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
 
 # primitive deps
-sp-core = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sp-blockchain = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sp-block-builder = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sp-api = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sp-application-crypto = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sp-transaction-pool = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sp-consensus-babe = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sp-consensus = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sc-keystore = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sp-runtime = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sp-session = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sp-offchain = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sp-inherents = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sp-timestamp = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sp-keyring = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sp-externalities = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sp-storage = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-sp-state-machine = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-core = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sp-blockchain = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sp-block-builder = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sp-api = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sp-application-crypto = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sp-transaction-pool = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sp-consensus-babe = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sp-consensus = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sc-keystore = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sp-runtime = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sp-session = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sp-offchain = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sp-inherents = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sp-timestamp = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sp-keyring = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sp-externalities = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sp-storage = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sp-keystore = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+sp-state-machine = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
 
 # pallets
-frame-system = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-pallet-balances = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-pallet-indices = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-pallet-transaction-payment = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+frame-system = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+pallet-balances = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+pallet-indices = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
+pallet-transaction-payment = { git = "https://github.com/paritytech/substrate.git", branch = "seun-kiz-election" }
 finality-grandpa = "0.12.3"
 
 parity-scale-codec = "1.3.1"
@@ -73,12 +74,8 @@ url = "1.7"
 primitive-types = "0.7"
 
 [dev-dependencies]
-node-runtime = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-node-executor = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-node-primitives = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
-node-cli = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 
-polkadot-runtime = { git = "https://github.com/paritytech/polkadot.git", branch = "seun-babe-manual-seal" }
-polkadot-core-primitives = { git = "https://github.com/paritytech/polkadot.git", branch = "seun-babe-manual-seal" }
-polkadot-service = { git = "https://github.com/paritytech/polkadot.git", branch = "seun-babe-manual-seal" }
-polkadot-runtime-common = { git = "https://github.com/paritytech/polkadot.git", branch = "seun-babe-manual-seal" }
+polkadot-runtime = { git = "https://github.com/paritytech/polkadot.git", branch = "kiz-comp--70-40" }
+polkadot-core-primitives = { git = "https://github.com/paritytech/polkadot.git", branch = "kiz-comp--70-40" }
+polkadot-service = { git = "https://github.com/paritytech/polkadot.git", branch = "kiz-comp--70-40" }
+polkadot-runtime-common = { git = "https://github.com/paritytech/polkadot.git", branch = "kiz-comp--70-40" }

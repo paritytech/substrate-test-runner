@@ -1,9 +1,9 @@
+use crate::node::TestRuntimeRequirements;
 use crate::rpc;
 use futures01::Future;
 use sp_externalities::Extensions;
 use sp_storage::{ChildInfo, StorageKey, TrackedStorageKey};
 use std::any::{Any, TypeId};
-use crate::node::TestRuntimeRequirements;
 
 pub struct TestExternalities<Node: TestRuntimeRequirements> {
 	client: rpc::StateClient<Node::Runtime>,
@@ -37,10 +37,11 @@ impl<Node: TestRuntimeRequirements> sp_externalities::ExtensionStore for TestExt
 	}
 
 	fn deregister_extension_by_type_id(&mut self, type_id: TypeId) -> Result<(), sp_externalities::Error> {
-		self.extensions
-			.deregister(type_id)
-			.ok_or(sp_externalities::Error::ExtensionIsNotRegistered(type_id))
-			.map(drop)
+		if self.extensions.deregister(type_id) {
+			Ok(())
+		} else {
+			Err(sp_externalities::Error::ExtensionIsNotRegistered(type_id))
+		}
 	}
 }
 
@@ -53,8 +54,9 @@ impl<Node: TestRuntimeRequirements> sp_externalities::Externalities for TestExte
 		// this is pretty weird, but stay with me.
 		// the tests in `simple_run` is wrapped with a tokio runtime
 		// so this means the code path here has access to the tokio v0.1 runtime
-		// requried for this future to complete, without the runtime, this call would panic.		
-		self.client.storage(StorageKey(key.to_vec()), None)
+		// requried for this future to complete, without the runtime, this call would panic.
+		self.client
+			.storage(StorageKey(key.to_vec()), None)
 			.wait()
 			.ok()
 			.flatten()
