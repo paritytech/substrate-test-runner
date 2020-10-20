@@ -81,6 +81,7 @@ polkadot-core-primitives = { git = "https://github.com/paritytech/polkadot.git",
 polkadot-service = { git = "https://github.com/paritytech/polkadot.git", branch = "seun-babe-manual-seal" }
 polkadot-runtime-common = { git = "https://github.com/paritytech/polkadot.git", branch = "seun-babe-manual-seal" }
 
-new-polkadot-runtime = { path = "../polkadot/runtime/polkadot", package = "polkadot-runtime" }
-new-frame-system = { path = "../substrate/frame/system", package = "frame-system" }
-new-frame-support = { path = "../substrate/frame/support", package = "frame-support" }
+new-polkadot-runtime = { git = "https://github.com/paritytech/polkadot.git", branch = "apopiak-bump-versions", package = "polkadot-runtime" }
+new-frame-system = { git = "https://github.com/paritytech/substrate.git", tag = "polkadot-0-8-25-dep", package = "frame-system" }
+new-frame-support = { git = "https://github.com/paritytech/substrate.git", tag = "polkadot-0-8-25-dep", package = "frame-support" }
+new-sp-core = { git = "https://github.com/paritytech/substrate.git", tag = "polkadot-0-8-25-dep", package = "sp-core" }
