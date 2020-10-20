@@ -175,60 +175,69 @@ fn should_run_off_chain_worker() {
 }
 
 #[test]
-fn should_read_and_write_state() {
+fn do_runtime_migration() {
+	use frame_support::{StorageValue, StorageMap};
+
 	// given
 	let mut test = test::deterministic::<Node>();
 
 	type Balances = pallet_balances::Module<Runtime>;
 
-	test.produce_blocks(1);
+	let whale = AccountId32::from_str("12dfEn1GycUmHtfEDW3BuQYzsMyUR1PqUPH2pyEikYeUX59o").unwrap();
 
-	let alice = Sr25519Keyring::Alice.pair();
-	let alice_account_id = MultiSigner::from(alice.public()).into_account();
-	let account_id = AccountId32::from_str("1rvXMZpAj9nKLQkPFCymyH7Fg3ZyKJhJbrc7UtHbTVhJm1A").unwrap();
-	let whale1 = AccountId32::from_str("12dfEn1GycUmHtfEDW3BuQYzsMyUR1PqUPH2pyEikYeUX59o").unwrap();
-
-	let old_balance = test.with_state(|| {
-		Balances::free_balance(account_id.clone())
+	let orig_whale_account = test.with_state(|| {
+		frame_system::Account::<Runtime>::get(whale.clone())
 	});
 
-	println!("\n\nold_balance: {:?}\n\n\n", old_balance);
+	test.produce_blocks(1);
 
 	let bytes = include_bytes!("/home/apopiak/remote-builds/polkadot/target/release/wbuild/polkadot-runtime/polkadot_runtime.compact.wasm").to_vec();
-	// test.send_extrinsic(SystemCall::<Runtime>::set_code(bytes), account_id);
-	// let proposal = SystemCall::<Runtime>::set_code(bytes).encode();
 
 	test.with_state(|| {
 		use sp_core::storage::well_known_keys;
 		frame_support::storage::unhashed::put_raw(well_known_keys::CODE, &bytes);
 
-		use frame_support::StorageValue;
 		frame_system::LastRuntimeUpgrade::set(None);
 	});
-	
-	// test.send_extrinsic(
-	// 	DemocracyCall::note_preimage(proposal.clone()),
-	// 	account_id.clone(),
-	// ).unwrap();
-
-	// let hash = sp_core::hashing::blake2_256(&proposal);
-	
-	// let deposit = 1_000_000_000_000;
-	// test.send_extrinsic(
-	// 	DemocracyCall::propose(H256::from(hash), deposit),
-	// 	account_id.clone(),
-	// ).unwrap();
 
 	test.produce_blocks(1);
 
-	let new_balance = test.with_state(|| {
-		Balances::free_balance(account_id)
+	// try a balance transfer after the upgrade
+	let account_id = AccountId32::from_str("1rvXMZpAj9nKLQkPFCymyH7Fg3ZyKJhJbrc7UtHbTVhJm1A").unwrap();
+	
+
+	let whale_account = test.with_state(|| {
+		use new_frame_support::StorageMap;
+
+		new_frame_system::Account::<new_polkadot_runtime::Runtime>::get(whale.clone())
 	});
 
-	println!("\n\nnew_balance: {:?}\n\n\n", new_balance);
+	println!("new whale account: {:?}", whale_account);
 
-	assert_eq!(old_balance + 7825388000000, new_balance);
-	// todo should probably have an api for deleting blocks.
+	// let whale_balance = test.with_state(|| {
+	// 	Balances::free_balance(whale.clone())
+	// });
+	// let old_balance = test.with_state(|| {
+	// 	Balances::free_balance(account_id.clone())
+	// });
+
+	// println!("\n\nold_balance: {:?}\n\n\n", old_balance);
+	// println!("\n\nwhale_balance: {:?}\n\n\n", whale_balance);
+
+	// test.send_extrinsic(
+	// 	BalancesCall::transfer(account_id.clone(), 1_000_000_000_000),
+	// 	whale,
+	// ).unwrap();
+
+	// test.produce_blocks(1);
+
+	// let new_balance = test.with_state(|| {
+	// 	Balances::free_balance(account_id)
+	// });
+
+	// println!("\n\nnew_balance: {:?}\n\n\n", new_balance);
+
+	// assert_eq!(old_balance + 1_000_000_000_000, new_balance);
 }
 
 #[test]
