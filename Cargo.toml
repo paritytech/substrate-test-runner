@@ -80,3 +80,7 @@ polkadot-runtime = { git = "https://github.com/paritytech/polkadot.git", branch 
 polkadot-core-primitives = { git = "https://github.com/paritytech/polkadot.git", branch = "seun-babe-manual-seal" }
 polkadot-service = { git = "https://github.com/paritytech/polkadot.git", branch = "seun-babe-manual-seal" }
 polkadot-runtime-common = { git = "https://github.com/paritytech/polkadot.git", branch = "seun-babe-manual-seal" }
+
+new-polkadot-runtime = { path = "../polkadot/runtime/polkadot", package = "polkadot-runtime" }
+new-frame-system = { path = "../substrate/frame/system", package = "frame-system" }
+new-frame-support = { path = "../substrate/frame/support", package = "frame-support" }
