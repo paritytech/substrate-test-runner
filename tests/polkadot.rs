@@ -181,9 +181,12 @@ fn do_runtime_migration() {
 	// given
 	let mut test = test::deterministic::<Node>();
 
+	test.revert_blocks(10).expect("initial reverting failed");
+
 	type Balances = pallet_balances::Module<Runtime>;
 
-	let whale = AccountId32::from_str("12dfEn1GycUmHtfEDW3BuQYzsMyUR1PqUPH2pyEikYeUX59o").unwrap();
+	let whale_str = "12dfEn1GycUmHtfEDW3BuQYzsMyUR1PqUPH2pyEikYeUX59o";
+	let whale = AccountId32::from_str(whale_str).unwrap();
 
 	let orig_whale_account = test.with_state(|| {
 		frame_system::Account::<Runtime>::get(whale.clone())
@@ -191,7 +194,8 @@ fn do_runtime_migration() {
 
 	test.produce_blocks(1);
 
-	let bytes = include_bytes!("/home/apopiak/remote-builds/polkadot/target/release/wbuild/polkadot-runtime/polkadot_runtime.compact.wasm").to_vec();
+	// let bytes = include_bytes!("/home/apopiak/remote-builds/polkadot/target/release/wbuild/polkadot-runtime/polkadot_runtime.compact.wasm").to_vec();
+	let bytes = new_polkadot_runtime::WASM_BINARY.expect("WASM runtime needs to be available.").to_vec();
 
 	test.with_state(|| {
 		use sp_core::storage::well_known_keys;
@@ -209,35 +213,14 @@ fn do_runtime_migration() {
 	let whale_account = test.with_state(|| {
 		use new_frame_support::StorageMap;
 
+		let whale = new_sp_core::crypto::AccountId32::from_str(whale_str).unwrap();
+
 		new_frame_system::Account::<new_polkadot_runtime::Runtime>::get(whale.clone())
 	});
 
 	println!("new whale account: {:?}", whale_account);
 
-	// let whale_balance = test.with_state(|| {
-	// 	Balances::free_balance(whale.clone())
-	// });
-	// let old_balance = test.with_state(|| {
-	// 	Balances::free_balance(account_id.clone())
-	// });
-
-	// println!("\n\nold_balance: {:?}\n\n\n", old_balance);
-	// println!("\n\nwhale_balance: {:?}\n\n\n", whale_balance);
-
-	// test.send_extrinsic(
-	// 	BalancesCall::transfer(account_id.clone(), 1_000_000_000_000),
-	// 	whale,
-	// ).unwrap();
-
-	// test.produce_blocks(1);
-
-	// let new_balance = test.with_state(|| {
-	// 	Balances::free_balance(account_id)
-	// });
-
-	// println!("\n\nnew_balance: {:?}\n\n\n", new_balance);
-
-	// assert_eq!(old_balance + 1_000_000_000_000, new_balance);
+	test.revert_blocks(2).expect("final reverting failed");
 }
 
 #[test]
