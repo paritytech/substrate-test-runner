@@ -10,7 +10,10 @@ use manual_seal::{run_manual_seal, ManualSealParams, consensus::ConsensusDataPro
 use sc_cli::build_runtime;
 use sc_client_api::{backend::Backend, ExecutorProvider, backend, CallExecutor};
 use sc_executor::NativeExecutionDispatch;
-use sc_service::{build_network, spawn_tasks, BuildNetworkParams, ChainSpec, Configuration, SpawnTasksParams, TFullBackend, TFullClient, TaskManager, TaskType, TFullCallExecutor};
+use sc_service::{
+	build_network, spawn_tasks, BuildNetworkParams, ChainSpec, Configuration, SpawnTasksParams, TFullBackend,
+	TFullClient, TaskManager, TaskType, TFullCallExecutor,
+};
 use sc_transaction_pool::BasicPool;
 use sp_api::{
 	ApiErrorExt, ApiExt, ConstructRuntimeApi, Core, Metadata,
@@ -24,7 +27,7 @@ use sp_session::SessionKeys;
 use sp_transaction_pool::runtime_api::TaggedTransactionQueue;
 use sc_keystore::KeyStorePtr;
 use sp_consensus::{BlockImport, SelectChain};
-use sp_runtime::traits::Extrinsic;
+use sp_runtime::traits::{Extrinsic, NumberFor};
 use parity_scale_codec::Encode;
 use sp_state_machine::Ext;
 
@@ -249,6 +252,12 @@ impl<Node: TestRuntimeRequirements> InternalNode<Node> {
 		let (client, fut) = local::connect_with_middleware::<C, _, _, _>(rpc_handler);
 		self._compat_runtime.borrow().spawn(fut.map_err(|_| ()));
 		client
+	}
+
+	/// revert count number of blocks from the chain
+	pub fn revert_blocks(&self, count: NumberFor<Node::Block>) -> Result<(), sp_blockchain::Error> {
+		self.backend.revert(count, true)?;
+		Ok(())
 	}
 
 	/// provides access to the tokio compat runtime.
