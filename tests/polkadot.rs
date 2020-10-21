@@ -208,26 +208,47 @@ fn do_runtime_migration() {
 
 	// try a balance transfer after the upgrade
 	let account_id = AccountId32::from_str("1rvXMZpAj9nKLQkPFCymyH7Fg3ZyKJhJbrc7UtHbTVhJm1A").unwrap();
-	
 
 	let whale_account = test.with_state(|| {
 		use new_frame_support::StorageMap;
 
-		let whale = new_sp_core::crypto::AccountId32::from_str(whale_str).unwrap();
+		let new_whale = new_sp_core::crypto::AccountId32::from_str(whale_str).unwrap();
 
 		sp_externalities::with_externalities(|ext| {
-			println!("got externalities");
-			let key = new_frame_system::Account::<new_polkadot_runtime::Runtime>::hashed_key_for(whale.clone());
+					/// Information of an account.
+			#[derive(Clone, Eq, PartialEq, Default, Debug, Encode, Decode)]
+			pub struct AccountInfo<Index, RefCount, AccountData> {
+				/// The number of transactions this account has sent.
+				pub nonce: Index,
+				/// The number of other modules that currently depend on this account's existence. The account
+				/// cannot be reaped until this is zero.
+				pub refcount: RefCount,
+				/// The additional data that belongs to this account. Used to store the balance(s) in a lot of
+				/// chains.
+				pub data: AccountData,
+			}
+
+			use parity_scale_codec::Decode;
+			let key = frame_system::Account::<Runtime>::hashed_key_for(whale.clone());
 			let raw = ext.storage(&key).expect("account should be present");
 			println!("raw: {:?}", raw);
-			new_frame_system::Account::<new_polkadot_runtime::Runtime>::get(whale.clone())
-		}).expect("externalities should be present")
+			let acc = AccountInfo::<u32, u8, pallet_balances::AccountData<u128>>::decode(&mut &raw[..]);
+			println!("acc: {:?}", acc);
+			let new_key = new_frame_system::Account::<new_polkadot_runtime::Runtime>::hashed_key_for(new_whale.clone());
+			let new_raw = ext.storage(&new_key).expect("account should be present");
+			println!("raw new: {:?}", new_raw);
+			let new_acc = new_frame_system::AccountInfo::<u32, new_pallet_balances::AccountData<u128>>::decode(&mut &new_raw[..]);
+			println!("acc new: {:?}", new_acc);
+		}).expect("externalities should be present");
 		
+		frame_system::Account::<Runtime>::get(whale.clone())
 	});
 
 	println!("new whale account: {:?}", whale_account);
 
 	test.revert_blocks(2).expect("final reverting failed");
+
+	assert!(false);
 }
 
 #[test]
