@@ -181,7 +181,7 @@ fn do_runtime_migration() {
 	// given
 	let mut test = test::deterministic::<Node>();
 
-	test.revert_blocks(10).expect("initial reverting failed");
+	test.revert_blocks(5).expect("initial reverting failed");
 
 	type Balances = pallet_balances::Module<Runtime>;
 
@@ -215,7 +215,14 @@ fn do_runtime_migration() {
 
 		let whale = new_sp_core::crypto::AccountId32::from_str(whale_str).unwrap();
 
-		new_frame_system::Account::<new_polkadot_runtime::Runtime>::get(whale.clone())
+		sp_externalities::with_externalities(|ext| {
+			println!("got externalities");
+			let key = new_frame_system::Account::<new_polkadot_runtime::Runtime>::hashed_key_for(whale.clone());
+			let raw = ext.storage(&key).expect("account should be present");
+			println!("raw: {:?}", raw);
+			new_frame_system::Account::<new_polkadot_runtime::Runtime>::get(whale.clone())
+		}).expect("externalities should be present")
+		
 	});
 
 	println!("new whale account: {:?}", whale_account);
