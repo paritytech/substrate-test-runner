@@ -8870,6 +8870,7 @@ dependencies = [
  "jsonrpc-core-client",
  "jsonrpc-pubsub",
  "log 0.4.11",
+ "pallet-balances 2.0.0 (git+https://github.com/paritytech/substrate.git?tag=polkadot-0-8-25-dep)",
  "pallet-balances 2.0.0 (git+https://github.com/paritytech/substrate.git?branch=seun-babe-manual-seal)",
  "pallet-democracy 2.0.0 (git+https://github.com/paritytech/substrate.git?branch=seun-babe-manual-seal)",
  "pallet-indices 2.0.0 (git+https://github.com/paritytech/substrate.git?branch=seun-babe-manual-seal)",

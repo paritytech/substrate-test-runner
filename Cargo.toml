@@ -85,3 +85,4 @@ new-polkadot-runtime = { git = "https://github.com/paritytech/polkadot.git", bra
 new-frame-system = { git = "https://github.com/paritytech/substrate.git", tag = "polkadot-0-8-25-dep", package = "frame-system" }
 new-frame-support = { git = "https://github.com/paritytech/substrate.git", tag = "polkadot-0-8-25-dep", package = "frame-support" }
 new-sp-core = { git = "https://github.com/paritytech/substrate.git", tag = "polkadot-0-8-25-dep", package = "sp-core" }
+new-pallet-balances = { git = "https://github.com/paritytech/substrate.git", tag = "polkadot-0-8-25-dep", package = "pallet-balances" }
