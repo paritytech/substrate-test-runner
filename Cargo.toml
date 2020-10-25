@@ -26,6 +26,7 @@ sc-state-db = { git = "https://github.com/paritytech/substrate.git", branch = "s
 
 # primitive deps
 sp-core = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-io = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 sp-blockchain = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 sp-block-builder = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 sp-api = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
@@ -49,6 +50,7 @@ frame-support = { git = "https://github.com/paritytech/substrate.git", branch = 
 frame-system = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 pallet-balances = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 pallet-democracy = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+pallet-collective = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 pallet-indices = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 pallet-transaction-payment = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 finality-grandpa = "0.12.3"
