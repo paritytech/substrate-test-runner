@@ -23,8 +23,9 @@ use sp_runtime::generic::Era;
 use std::str::FromStr;
 
 use primitive_types::H256;
-use parity_scale_codec::Encode;
+use parity_scale_codec::{Encode, Decode};
 use hex::ToHex;
+use polkadot_core_primitives::AccountId;
 
 struct Node;
 
@@ -257,6 +258,19 @@ fn do_runtime_migration() {
 fn runtime_upgrade() {
 	use frame_support::{StorageValue, StorageMap};
 
+	/// Information of an account.
+	#[derive(Clone, Eq, PartialEq, Default, Debug, Encode, Decode)]
+	pub struct AccountInfo<Index, RefCount, AccountData> {
+		/// The number of transactions this account has sent.
+		pub nonce: Index,
+		/// The number of other modules that currently depend on this account's existence. The account
+        /// cannot be reaped until this is zero.
+		pub refcount: RefCount,
+		/// The additional data that belongs to this account. Used to store the balance(s) in a lot of
+        /// chains.
+		pub data: AccountData,
+	}
+
 	// given
 	let mut test = test::deterministic::<Node>();
 
@@ -264,11 +278,26 @@ fn runtime_upgrade() {
 	type Democracy = pallet_democracy::Module<Runtime>;
 	type Collective = pallet_collective::Module<Runtime>;
 
+	let whale = AccountId32::from_str("12dfEn1GycUmHtfEDW3BuQYzsMyUR1PqUPH2pyEikYeUX59o").unwrap();
 	let whale_balance = test.with_state(|| {
 		Balances::free_balance(whale.clone())
 	});
 
 	log::info!("whale balance {}", whale_balance);
+
+	// pre-upgrade assertions
+	test.with_state(|| {
+		use frame_support::StorageMap;
+
+		sp_externalities::with_externalities(|ext| {
+			let key = frame_system::Account::<Runtime>::hashed_key_for(whale.clone());
+			let raw = ext.storage(&key).expect("account should be present");
+			println!("raw: {:?}", raw);
+			let acc = AccountInfo::<u32, u8, pallet_balances::AccountData<u128>>::decode(&mut &raw[..]);
+			println!("acc: {:?}", acc);
+			assert!(acc.is_ok());
+		})
+	});
 	let wasm = new_polkadot_runtime::WASM_BINARY.expect("WASM runtime needs to be available.").to_vec();
 
 	let (technical_collective, council_collective) = test.with_state(|| {
@@ -296,10 +325,10 @@ fn runtime_upgrade() {
 
 	// TODO: fetch proposal index from logs
 	// vote
-	let proposal_hash = sp_core::blake2_256(proposal);
+	let council_proposal_hash = sp_core::blake2_256(&proposal.encode());
 	for member in &council_collective {
 		test.send_extrinsic(
-			CollectiveCall::vote(proposal_hash.clone(), proposal_index, true),
+			CollectiveCall::vote(council_proposal_hash.clone(), proposal_index, true),
 			member.clone()
 		).unwrap();
 	}
@@ -307,7 +336,7 @@ fn runtime_upgrade() {
 
 	// close vote
 	test.send_extrinsic(
-		CollectiveCall::close(proposal_hash, proposal_index, proposal_weight, proposal_length),
+		CollectiveCall::close(council_proposal_hash, proposal_index, proposal_weight, proposal_length),
 		council_collective[0].clone()
 	);
 	test.produce_blocks(1);
@@ -316,7 +345,7 @@ fn runtime_upgrade() {
 	let fast_track = DemocracyCall::fast_track(proposal_hash.into(), voting_period, 0);
 	let fast_track_length = fast_track.encode().len();
 	let proposal = CollectiveCall::propose(technical_collective.len(), fast_track, fast_track_length);
-	let proposal_hash = sp_core::blake2_256(proposal);
+	let technical_proposal_hash = sp_core::blake2_256(&proposal.encode());
 	test.send_extrinsic(
 		proposal,
 		technical_collective[0].clone(),
@@ -325,9 +354,9 @@ fn runtime_upgrade() {
 
 	// TODO: fetch proposal index from logs
 	// vote
-	for member in &council_collective {
+	for member in &technical_collective {
 		test.send_extrinsic(
-			CollectiveCall::vote(proposal_hash.clone(), proposal_index, true),
+			CollectiveCall::vote(technical_proposal_hash.clone(), proposal_index, true),
 			member.clone()
 		).unwrap();
 	}
@@ -335,59 +364,34 @@ fn runtime_upgrade() {
 
 	// close vote
 	test.send_extrinsic(
-		CollectiveCall::close(proposal_hash, proposal_index, proposal_weight, proposal_length),
-		council_collective[0].clone()
+		CollectiveCall::close(technical_proposal_hash, proposal_index, proposal_weight, proposal_length),
+		technical_collective[0].clone()
 	);
 	test.produce_blocks(1);
 
 	// wait for fast track period.
 	test.produce_blocks(1800);
 
+	// TODO: assert runtime upgraded event in logs
+
 	test.produce_blocks(1);
 
-	// try a balance transfer after the upgrade
-	let account_id = AccountId32::from_str("1rvXMZpAj9nKLQkPFCymyH7Fg3ZyKJhJbrc7UtHbTVhJm1A").unwrap();
-
-	let whale_account = test.with_state(|| {
+	test.with_state(|| {
 		use new_frame_support::StorageMap;
 
-		let new_whale = new_sp_core::crypto::AccountId32::from_str(whale_str).unwrap();
+		let new_whale = new_sp_core::crypto::AccountId32::from_str("12dfEn1GycUmHtfEDW3BuQYzsMyUR1PqUPH2pyEikYeUX59o").unwrap();
 
 		sp_externalities::with_externalities(|ext| {
-			/// Information of an account.
-			#[derive(Clone, Eq, PartialEq, Default, Debug, Encode, Decode)]
-			pub struct AccountInfo<Index, RefCount, AccountData> {
-				/// The number of transactions this account has sent.
-				pub nonce: Index,
-				/// The number of other modules that currently depend on this account's existence. The account
-				/// cannot be reaped until this is zero.
-				pub refcount: RefCount,
-				/// The additional data that belongs to this account. Used to store the balance(s) in a lot of
-				/// chains.
-				pub data: AccountData,
-			}
-
-			use parity_scale_codec::Decode;
-			let key = frame_system::Account::<Runtime>::hashed_key_for(whale.clone());
-			let raw = ext.storage(&key).expect("account should be present");
-			println!("raw: {:?}", raw);
-			let acc = AccountInfo::<u32, u8, pallet_balances::AccountData<u128>>::decode(&mut &raw[..]);
-			println!("acc: {:?}", acc);
 			let new_key = new_frame_system::Account::<new_polkadot_runtime::Runtime>::hashed_key_for(new_whale.clone());
 			let new_raw = ext.storage(&new_key).expect("account should be present");
-			println!("raw new: {:?}", new_raw);
 			let new_acc = new_frame_system::AccountInfo::<u32, new_pallet_balances::AccountData<u128>>::decode(&mut &new_raw[..]);
 			println!("acc new: {:?}", new_acc);
-		}).expect("externalities should be present");
+			assert!(new_acc.is_ok())
 
-		frame_system::Account::<Runtime>::get(whale.clone())
+		}).expect("externalities should be present");
 	});
 
-	println!("new whale account: {:?}", whale_account);
-
 	test.revert_blocks(2).expect("final reverting failed");
-
-	assert!(false);
 }
 
 #[test]
