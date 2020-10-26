@@ -25,7 +25,7 @@ use sp_offchain::OffchainWorkerApi;
 use sp_runtime::{traits::{Block as BlockT, SignedExtension}, generic::UncheckedExtrinsic, MultiSignature};
 use sp_session::SessionKeys;
 use sp_transaction_pool::runtime_api::TaggedTransactionQueue;
-use sc_keystore::KeyStorePtr;
+use sp_keystore::KeyStorePtr;
 use sp_consensus::{BlockImport, SelectChain};
 use sp_runtime::traits::{Extrinsic, NumberFor};
 use parity_scale_codec::Encode;
