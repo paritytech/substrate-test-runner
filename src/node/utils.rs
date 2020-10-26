@@ -9,6 +9,7 @@ use sc_client_api::execution_extensions::ExecutionStrategies;
 use futures::{Sink, SinkExt};
 use std::fmt;
 use std::io::Write;
+use sc_state_db::PruningMode;
 
 /// Provides access to state.
 pub trait StateProvider {
@@ -51,7 +52,6 @@ pub fn build_config<Node>(task_executor: TaskExecutor) -> Configuration
     );
     let informant_output_format = OutputFormat {
         enable_color: false,
-        prefix: format!("[{}] ", key_seed),
     };
 
     network_config.allow_non_globals_in_dht = true;
@@ -73,13 +73,12 @@ pub fn build_config<Node>(task_executor: TaskExecutor) -> Configuration
             path: root_path.join("key"),
             password: None,
         },
-        database: DatabaseConfig::RocksDb {
-            path: root_path.join("db"),
-            cache_size: 128,
+        database: DatabaseConfig::ParityDb {
+            path: root_path.join("paritydb"),
         },
         state_cache_size: 16777216,
         state_cache_child_ratio: None,
-        pruning: Default::default(),
+        pruning: PruningMode::ArchiveAll,
         chain_spec,
         wasm_method: WasmExecutionMethod::Interpreted,
         // NOTE: we enforce the use of the native runtime to make the errors more debuggable
@@ -126,6 +125,7 @@ pub fn build_logger<LogSink>(executor: tokio::runtime::Handle, log_sink: LogSink
         "jsonrpc_client_transports",
         "sc_network",
         "tokio_reactor",
+        "parity-db",
         "sub-libp2p",
         "sync",
         "peerset",

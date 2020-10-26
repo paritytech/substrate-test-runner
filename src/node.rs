@@ -4,13 +4,12 @@ use futures::{channel::mpsc, compat::Future01CompatExt, FutureExt};
 use jsonrpc_core::MetaIoHandler;
 use jsonrpc_core_client::{transports::local, RpcChannel};
 use manual_seal::{consensus::ConsensusDataProvider, run_manual_seal, ManualSealParams};
-use parity_scale_codec::Encode;
 use sc_cli::build_runtime;
 use sc_client_api::{backend, backend::Backend, CallExecutor, ExecutorProvider};
 use sc_executor::NativeExecutionDispatch;
 use sc_service::{
 	build_network, spawn_tasks, BuildNetworkParams, ChainSpec, Configuration, SpawnTasksParams, TFullBackend,
-	TFullCallExecutor, TFullClient, TaskManager, TaskType,
+	TFullClient, TaskManager, TaskType, TFullCallExecutor,
 };
 use sc_transaction_pool::BasicPool;
 use sp_api::{
@@ -21,13 +20,10 @@ use sp_consensus::{BlockImport, SelectChain};
 use sp_inherents::InherentDataProviders;
 use sp_keystore::SyncCryptoStorePtr;
 use sp_offchain::OffchainWorkerApi;
-use sp_runtime::traits::Extrinsic;
-use sp_runtime::{
-	generic::UncheckedExtrinsic,
-	traits::{Block as BlockT, SignedExtension},
-	MultiSignature,
-};
+use sp_runtime::{traits::{Block as BlockT, SignedExtension}, generic::UncheckedExtrinsic, MultiSignature};
 use sp_session::SessionKeys;
+use sp_runtime::traits::{Extrinsic, NumberFor};
+use parity_scale_codec::Encode;
 use sp_state_machine::Ext;
 use sp_transaction_pool::runtime_api::TaggedTransactionQueue;
 
@@ -141,6 +137,7 @@ impl<Node: TestRuntimeRequirements> InternalNode<Node> {
 
 		// Proposer object for block authorship.
 		let env = sc_basic_authorship::ProposerFactory::new(
+			task_manager.spawn_handle(),
 			client.clone(),
 			transaction_pool.clone(),
 			config.prometheus_registry(),
@@ -214,6 +211,11 @@ impl<Node: TestRuntimeRequirements> InternalNode<Node> {
 		self.rpc_handler.clone()
 	}
 
+	/// return a reference to the Client
+	pub fn client(&self) -> Arc<TFullClient<Node::Block, Node::RuntimeApi, Node::Executor>> {
+		self.client.clone()
+	}
+
 	/// send some extrinsic to the node, providing the sending account.
 	pub fn send_extrinsic(
 		&self,
@@ -250,6 +252,12 @@ impl<Node: TestRuntimeRequirements> InternalNode<Node> {
 		let (client, fut) = local::connect_with_middleware::<C, _, _, _>(rpc_handler);
 		self._compat_runtime.borrow().spawn(fut.map_err(|_| ()));
 		client
+	}
+
+	/// revert count number of blocks from the chain
+	pub fn revert_blocks(&self, count: NumberFor<Node::Block>) -> Result<(), sp_blockchain::Error> {
+		self.backend.revert(count, true)?;
+		Ok(())
 	}
 
 	/// provides access to the tokio compat runtime.
