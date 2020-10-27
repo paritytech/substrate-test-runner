@@ -3,7 +3,7 @@ use futures::compat::Future01CompatExt;
 use manual_seal::consensus::{babe::BabeConsensusDataProvider, ConsensusDataProvider};
 use pallet_balances::Call as BalancesCall;
 use parity_scale_codec::alloc::sync::Arc;
-use polkadot_runtime::{Runtime, SignedExtra};
+use polkadot_runtime::{Runtime, SignedExtra, FastTrackVotingPeriod};
 use polkadot_service::{chain_spec::polkadot_development_config_genesis, PolkadotChainSpec};
 use sc_consensus_babe::BabeBlockImport;
 use sc_finality_grandpa::GrandpaBlockImport;
@@ -379,7 +379,7 @@ fn runtime_upgrade() {
 	test.produce_blocks(1);
 
 	// wait for fast track period.
-	test.produce_blocks(1800);
+	test.produce_blocks(FastTrackVotingPeriod::get() as usize);
 
 	// TODO: assert runtime upgraded event in logs
 
@@ -400,7 +400,7 @@ fn runtime_upgrade() {
 		}).expect("externalities should be present");
 	});
 
-	test.revert_blocks(2).expect("final reverting failed");
+	test.revert_blocks(8 + FastTrackVotingPeriod::get() as _).expect("final reverting failed");
 }
 
 #[test]
