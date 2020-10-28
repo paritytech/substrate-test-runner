@@ -9,7 +9,6 @@ use sc_client_api::execution_extensions::ExecutionStrategies;
 use futures::{Sink, SinkExt};
 use std::fmt;
 use std::io::Write;
-use sc_state_db::PruningMode;
 
 /// Provides access to state.
 pub trait StateProvider {
@@ -73,12 +72,13 @@ pub fn build_config<Node>(task_executor: TaskExecutor) -> Configuration
             path: root_path.join("key"),
             password: None,
         },
-        database: DatabaseConfig::ParityDb {
-            path: root_path.join("paritydb"),
+        database: DatabaseConfig::RocksDb {
+            path: root_path.join("db"),
+            cache_size: 128
         },
         state_cache_size: 16777216,
         state_cache_child_ratio: None,
-        pruning: PruningMode::ArchiveAll,
+        pruning: Default::default(),
         chain_spec,
         wasm_method: WasmExecutionMethod::Interpreted,
         // NOTE: we enforce the use of the native runtime to make the errors more debuggable
@@ -108,6 +108,7 @@ pub fn build_config<Node>(task_executor: TaskExecutor) -> Configuration
         max_runtime_instances: 8,
         announce_block: true,
         base_path: Some(base_path),
+        wasm_runtime_overrides: None,
         informant_output_format,
     }
 }
