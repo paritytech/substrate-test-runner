@@ -41,19 +41,17 @@ impl<Node: TestRuntimeRequirements> Deterministic<Node> {
 	}
 
 	pub fn produce_blocks(&mut self, num: usize) {
-		let mut pb = pbr::ProgressBar::new(num as u64);
-		pb.format("╢▌▌░╟");
 		let client = self.rpc::<ManualSealClient<<Node::Block as BlockT>::Hash>>();
+		let mut count = 0;
 
 		for _ in 0..num {
 			self.node.compat_runtime()
 				.borrow_mut()
 				.block_on(client.create_block(true, false, None))
 				.expect("block production failed: ");
-			pb.inc();
+			count += 1;
+			log::info!("sealed {} of {} blocks", count, num)
 		}
-
-		log::info!("sealed {} blocks", num)
 	}
 }
 

@@ -15,6 +15,7 @@ sc-rpc-api = { git = "https://github.com/paritytech/substrate.git", branch = "se
 sc-basic-authorship = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 sc-rpc = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 sc-transaction-pool = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sc-transaction-graph = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 sc-client-api = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 sc-rpc-server = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 manual-seal = { package = "sc-consensus-manual-seal", git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }

@@ -1,6 +1,6 @@
 use std::{cell::RefCell, sync::Arc};
 
-use futures::{channel::mpsc, compat::Future01CompatExt, FutureExt};
+use futures::{channel::mpsc, FutureExt};
 use jsonrpc_core::MetaIoHandler;
 use jsonrpc_core_client::{transports::local, RpcChannel};
 use manual_seal::{consensus::ConsensusDataProvider, run_manual_seal, ManualSealParams};
@@ -8,26 +8,30 @@ use sc_cli::build_runtime;
 use sc_client_api::{backend, backend::Backend, CallExecutor, ExecutorProvider};
 use sc_executor::NativeExecutionDispatch;
 use sc_service::{
-	build_network, spawn_tasks, BuildNetworkParams, ChainSpec, Configuration, SpawnTasksParams, TFullBackend,
-	TFullClient, TaskManager, TaskType, TFullCallExecutor,
+	build_network, spawn_tasks, BuildNetworkParams, ChainSpec, Configuration, SpawnTasksParams,
+	TFullBackend, TFullClient, TaskManager, TaskType, TFullCallExecutor,
 };
 use sc_transaction_pool::BasicPool;
 use sp_api::{
-	ApiErrorExt, ApiExt, ConstructRuntimeApi, Core, Metadata, OverlayedChanges, StorageTransactionCache, TransactionFor,
+	ApiErrorExt, ApiExt, ConstructRuntimeApi, Core, Metadata,
+	OverlayedChanges, StorageTransactionCache, TransactionFor,
 };
 use sp_block_builder::BlockBuilder;
 use sp_consensus::{BlockImport, SelectChain};
 use sp_inherents::InherentDataProviders;
 use sp_keystore::SyncCryptoStorePtr;
 use sp_offchain::OffchainWorkerApi;
-use sp_runtime::{traits::{Block as BlockT, SignedExtension}, generic::UncheckedExtrinsic, MultiSignature};
+use sp_runtime::traits::{Block as BlockT, SignedExtension, Extrinsic};
 use sp_session::SessionKeys;
-use sp_runtime::traits::{Extrinsic, NumberFor};
+use sp_runtime::{generic::UncheckedExtrinsic, traits::NumberFor};
 use parity_scale_codec::Encode;
 use sp_state_machine::Ext;
 use sp_transaction_pool::runtime_api::TaggedTransactionQueue;
-
-use crate::rpc;
+use sp_blockchain::HeaderBackend;
+use sp_core::{ExecutionContext, offchain::storage::OffchainOverlayedChanges};
+use sp_runtime::generic::BlockId;
+use sp_transaction_pool::TransactionPool;
+use sp_runtime::transaction_validity::TransactionSource;
 
 mod extensions;
 pub mod utils;
@@ -36,10 +40,7 @@ pub use self::{
 	extensions::ExtensionFactory,
 	utils::{build_config, build_logger, StateProvider},
 };
-use sp_blockchain::HeaderBackend;
-use sp_core::offchain::storage::OffchainOverlayedChanges;
-use sp_core::ExecutionContext;
-use sp_runtime::generic::BlockId;
+use sp_runtime::MultiSignature;
 
 /// This holds a reference to a running node on another thread,
 /// the node process is dropped when this struct is dropped
@@ -57,6 +58,16 @@ pub struct InternalNode<Node: TestRuntimeRequirements> {
 	_task_manager: Option<TaskManager>,
 	/// client instance
 	client: Arc<TFullClient<Node::Block, Node::RuntimeApi, Node::Executor>>,
+	/// transaction pool
+	pool: Arc<dyn TransactionPool<
+		Block = Node::Block,
+		Hash = <Node::Block as BlockT>::Hash,
+		Error = sc_transaction_pool::error::Error,
+		InPoolTransaction = sc_transaction_graph::base_pool::Transaction<
+			<Node::Block as BlockT>::Hash,
+			<Node::Block as BlockT>::Extrinsic
+		>
+	>>,
 	/// backend type.
 	backend: Arc<TFullBackend<Node::Block>>,
 }
@@ -201,6 +212,7 @@ impl<Node: TestRuntimeRequirements> InternalNode<Node> {
 			_runtime: tokio_runtime,
 			_compat_runtime: RefCell::new(compat_runtime),
 			client,
+			pool: transaction_pool,
 			backend,
 			log_stream,
 		})
@@ -221,10 +233,18 @@ impl<Node: TestRuntimeRequirements> InternalNode<Node> {
 		&self,
 		call: impl Into<<Node::Runtime as frame_system::Trait>::Call>,
 		from: <Node::Runtime as frame_system::Trait>::AccountId,
-	) -> Result<<Node::Runtime as frame_system::Trait>::Hash, jsonrpc_core_client::RpcError>
+	) -> <Node::Block as BlockT>::Hash
 	where
 		<Node::Runtime as frame_system::Trait>::AccountId: Encode,
 		<Node::Runtime as frame_system::Trait>::Call: Encode,
+		<Node::Block as BlockT>::Extrinsic: From<
+			UncheckedExtrinsic<
+				<Node::Runtime as frame_system::Trait>::AccountId,
+				<Node::Runtime as frame_system::Trait>::Call,
+				MultiSignature,
+				Node::SignedExtras,
+			>
+		>
 	{
 		let extra = Node::signed_extras::<Self>(&self, from.clone());
 		let signed_data = Some((from, Default::default(), extra));
@@ -232,14 +252,15 @@ impl<Node: TestRuntimeRequirements> InternalNode<Node> {
 			<Node::Runtime as frame_system::Trait>::AccountId,
 			<Node::Runtime as frame_system::Trait>::Call,
 			MultiSignature,
-			Node::SignedExtension,
+			Node::SignedExtras,
 		>::new(call.into(), signed_data)
 		.expect("UncheckedExtrinsic::new() always returns Some");
-		let rpc_client = self.rpc_client::<rpc::AuthorClient<Node::Runtime>>();
+		let at = self.client.info().best_hash;
 
 		self.compat_runtime()
 			.borrow_mut()
-			.block_on_std(async move { rpc_client.submit_extrinsic(ext.encode().into()).compat().await })
+			.block_on_std(self.pool.submit_one(&BlockId::Hash(at), TransactionSource::Local, ext.into()))
+			.unwrap()
 	}
 
 	/// create a new jsonrpc client using the jsonrpc-core-client local transport
@@ -344,7 +365,7 @@ pub trait TestRuntimeRequirements: Sized {
 			Transaction = TransactionFor<TFullClient<Self::Block, Self::RuntimeApi, Self::Executor>, Self::Block>,
 		> + 'static;
 
-	type SignedExtension: SignedExtension;
+	type SignedExtras: SignedExtension;
 
 	/// chain spec factory
 	fn load_spec() -> Result<Box<dyn ChainSpec>, String>;
@@ -355,7 +376,7 @@ pub trait TestRuntimeRequirements: Sized {
 	}
 
 	/// Signed extras.
-	fn signed_extras<S>(state: &S, from: <Self::Runtime as frame_system::Trait>::AccountId) -> Self::SignedExtension
+	fn signed_extras<S>(state: &S, from: <Self::Runtime as frame_system::Trait>::AccountId) -> Self::SignedExtras
 	where
 		S: StateProvider;
 
