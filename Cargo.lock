@@ -830,6 +830,16 @@ dependencies = [
 
 [[package]]
 name = "crossbeam-channel"
+version = "0.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b153fe7cbef478c567df0f972e02e6d736db11affe43dfc9c56a9374d1adfb87"
+dependencies = [
+ "crossbeam-utils 0.7.2",
+ "maybe-uninit",
+]
+
+[[package]]
+name = "crossbeam-channel"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dca26ee1f8d361640700bde38b2c37d8c22b3ce2d360e1fc1c74ea4b0aa7d775"
@@ -4360,6 +4370,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "pbr"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74333e3d1d8bced07fd0b8599304825684bcdb4a1fcc6fa6a470e6e08cefd254"
+dependencies = [
+ "crossbeam-channel 0.4.4",
+ "libc",
+ "time",
+ "winapi 0.3.9",
+]
+
+[[package]]
 name = "pdqselect"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5550,7 +5572,7 @@ version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9ab346ac5921dc62ffa9f89b7a773907511cdfa5490c572ae9be1be33e8afa4a"
 dependencies = [
- "crossbeam-channel",
+ "crossbeam-channel 0.5.0",
  "crossbeam-deque 0.8.0",
  "crossbeam-utils 0.8.0",
  "lazy_static",
@@ -7988,6 +8010,7 @@ dependencies = [
  "pallet-democracy",
  "pallet-transaction-payment",
  "parity-scale-codec",
+ "pbr",
  "polkadot-core-primitives",
  "polkadot-runtime",
  "polkadot-runtime-common",

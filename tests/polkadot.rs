@@ -1,7 +1,4 @@
-#![allow(dead_code)]
-use futures::compat::Future01CompatExt;
 use manual_seal::consensus::{babe::BabeConsensusDataProvider, ConsensusDataProvider};
-use pallet_balances::Call as BalancesCall;
 use parity_scale_codec::alloc::sync::Arc;
 use polkadot_runtime::{Runtime, SignedExtra, FastTrackVotingPeriod, Event};
 use polkadot_service::{chain_spec::polkadot_development_config_genesis, PolkadotChainSpec};
@@ -10,45 +7,19 @@ use sc_finality_grandpa::GrandpaBlockImport;
 use sc_service::{new_full_parts, ChainType, Configuration, TFullBackend, TFullClient, TaskManager};
 use sp_api::TransactionFor;
 use sp_consensus_babe::AuthorityId;
-use sp_core::crypto::{AccountId32, Pair};
+use sp_core::crypto::AccountId32;
 use sp_inherents::InherentDataProviders;
 use sp_keyring::sr25519::Keyring::Alice;
-use sp_keyring::Sr25519Keyring;
 use sp_keystore::SyncCryptoStorePtr;
 use sp_runtime::generic::Era;
-use sp_runtime::{traits::IdentifyAccount, MultiSigner};
 use std::str::FromStr;
-use substrate_test_runner::{
-	node::{StateProvider, TestRuntimeRequirements},
-	prelude::*,
-	rpc, test,
-};
-
-use primitive_types::H256;
-use parity_scale_codec::{Encode, Decode};
-use hex::ToHex;
-use polkadot_core_primitives::AccountId;
-use sp_blockchain::HeaderBackend;
+use substrate_test_runner::{node::{StateProvider, TestRuntimeRequirements}, test};
+use parity_scale_codec::Encode;
 use frame_support::dispatch::GetDispatchInfo;
-use frame_system::{EventRecord, RawEvent};
 
 struct Node;
 
 type BlockImport<B, BE, C, SC> = BabeBlockImport<B, C, GrandpaBlockImport<BE, B, C, SC>>;
-
-/// Information of an account.
-#[derive(Clone, Eq, PartialEq, Default, Debug, Encode, Decode)]
-pub struct AccountInfo<Index, RefCount, AccountData> {
-	/// The number of transactions this account has sent.
-	pub nonce: Index,
-	/// The number of other modules that currently depend on this account's existence. The account
-    /// cannot be reaped until this is zero.
-	pub refcount: RefCount,
-	/// The additional data that belongs to this account. Used to store the balance(s) in a lot of
-    /// chains.
-	pub data: AccountData,
-}
-
 
 impl TestRuntimeRequirements for Node {
 	type Block = polkadot_core_primitives::Block;
@@ -88,15 +59,7 @@ impl TestRuntimeRequirements for Node {
 	where
 		S: StateProvider,
 	{
-		let nonce = state.with_state(|| {
-			use frame_support::StorageMap;
-			sp_externalities::with_externalities(|ext| {
-				let key = frame_system::Account::<Runtime>::hashed_key_for(from.clone());
-				let raw = ext.storage(&key).expect("account should be present");
-				let acc = AccountInfo::<u32, u8, pallet_balances::AccountData<u128>>::decode(&mut &raw[..]).unwrap();
-				acc.nonce
-			}).unwrap()
-		});
+		let nonce = state.with_state(|| frame_system::Module::<Runtime>::account_nonce(from));
 
 		(
 			frame_system::CheckSpecVersion::<Self::Runtime>::new(),
@@ -174,140 +137,26 @@ impl TestRuntimeRequirements for Node {
 }
 
 #[test]
-fn should_run_off_chain_worker() {
-	let mut test = test::deterministic::<Node>();
-
-	let chain_client = test.rpc::<rpc::ChainClient<Runtime>>();
-	let rpc_client = test.raw_rpc();
-
-	test.compat_runtime().borrow_mut().block_on_std(async {
-		// TODO [ToDr] This should be even rawer - allowing to pass JSON call,
-		// which in turn could be collected from the UI.
-		let header = rpc_client
-			.call_method("chain_getHeader", rpc::Params::Array(vec![]))
-			.compat()
-			.await;
-		println!("{:?}", header);
-
-		let header = chain_client.header(None).compat().await.unwrap();
-		println!("{:?}", header);
-	});
-
-	test.produce_blocks(15);
-
-	test.assert_log_line("best = true");
-}
-
-// #[test]
-// fn do_runtime_migration() {
-// 	use frame_support::{StorageValue, StorageMap};
-//
-// 	// given
-// 	let mut test = test::deterministic::<Node>();
-//
-// 	test.revert_blocks(5).expect("initial reverting failed");
-//
-// 	type Balances = pallet_balances::Module<Runtime>;
-//
-// 	let whale_str = "12dfEn1GycUmHtfEDW3BuQYzsMyUR1PqUPH2pyEikYeUX59o";
-// 	let whale = AccountId32::from_str(whale_str).unwrap();
-//
-// 	let orig_whale_account = test.with_state(|| {
-// 		frame_system::Account::<Runtime>::get(whale.clone())
-// 	});
-//
-// 	test.produce_blocks(1);
-//
-// 	// let bytes = include_bytes!("/home/apopiak/remote-builds/polkadot/target/release/wbuild/polkadot-runtime/polkadot_runtime.compact.wasm").to_vec();
-// 	let bytes = new_polkadot_runtime::WASM_BINARY.expect("WASM runtime needs to be available.").to_vec();
-//
-// 	test.with_state(|| {
-// 		use sp_core::storage::well_known_keys;
-// 		frame_support::storage::unhashed::put_raw(well_known_keys::CODE, &bytes);
-//
-// 		frame_system::LastRuntimeUpgrade::set(None);
-// 	});
-//
-// 	test.produce_blocks(1);
-//
-// 	// try a balance transfer after the upgrade
-// 	let account_id = AccountId32::from_str("1rvXMZpAj9nKLQkPFCymyH7Fg3ZyKJhJbrc7UtHbTVhJm1A").unwrap();
-//
-// 	let whale_account = test.with_state(|| {
-// 		use new_frame_support::StorageMap;
-//
-// 		let new_whale = new_sp_core::crypto::AccountId32::from_str(whale_str).unwrap();
-//
-// 		sp_externalities::with_externalities(|ext| {
-// 					/// Information of an account.
-// 			#[derive(Clone, Eq, PartialEq, Default, Debug, Encode, Decode)]
-// 			pub struct AccountInfo<Index, RefCount, AccountData> {
-// 				/// The number of transactions this account has sent.
-// 				pub nonce: Index,
-// 				/// The number of other modules that currently depend on this account's existence. The account
-// 				/// cannot be reaped until this is zero.
-// 				pub refcount: RefCount,
-// 				/// The additional data that belongs to this account. Used to store the balance(s) in a lot of
-// 				/// chains.
-// 				pub data: AccountData,
-// 			}
-//
-// 			use parity_scale_codec::Decode;
-// 			let key = frame_system::Account::<Runtime>::hashed_key_for(whale.clone());
-// 			let raw = ext.storage(&key).expect("account should be present");
-// 			println!("raw: {:?}", raw);
-// 			let acc = AccountInfo::<u32, u8, pallet_balances::AccountData<u128>>::decode(&mut &raw[..]);
-// 			println!("acc: {:?}", acc);
-// 			let new_key = new_frame_system::Account::<new_polkadot_runtime::Runtime>::hashed_key_for(new_whale.clone());
-// 			let new_raw = ext.storage(&new_key).expect("account should be present");
-// 			println!("raw new: {:?}", new_raw);
-// 			let new_acc = new_frame_system::AccountInfo::<u32, new_pallet_balances::AccountData<u128>>::decode(&mut &new_raw[..]);
-// 			println!("acc new: {:?}", new_acc);
-// 		}).expect("externalities should be present");
-//
-// 		frame_system::Account::<Runtime>::get(whale.clone())
-// 	});
-//
-// 	println!("new whale account: {:?}", whale_account);
-//
-// 	test.revert_blocks(2).expect("final reverting failed");
-//
-// 	assert!(false);
-// }
-
-#[test]
 fn runtime_upgrade() {
-	use frame_support::{StorageValue, StorageMap};
+	use frame_support::StorageValue;
 	use polkadot_runtime::{CouncilCollective, TechnicalCollective};
 
-	// given
 	let mut test = test::deterministic::<Node>();
+	test.revert_blocks(8 + FastTrackVotingPeriod::get()).expect("final reverting failed");
 
-	// test.revert_blocks(5).expect("final reverting failed");
 
-	type Balances = pallet_balances::Module<Runtime>;
-	type Democracy = pallet_democracy::Module<Runtime>;
-	type Collective = pallet_collective::Module<Runtime>;
 	type SystemCall = frame_system::Call<Runtime>;
-	type SystemEvents = frame_system::Events<Runtime>;
 	type DemocracyCall = pallet_democracy::Call<Runtime>;
 	type TechnicalCollectiveCall = pallet_collective::Call<Runtime, TechnicalCollective>;
 	type CouncilCollectiveCall = pallet_collective::Call<Runtime, CouncilCollective>;
 
+	// here lies a black mirror esque copy of an on chain whale.
 	let whale = AccountId32::from_str("1rvXMZpAj9nKLQkPFCymyH7Fg3ZyKJhJbrc7UtHbTVhJm1A").unwrap();
-	// pre-upgrade assertions
-	test.with_state(|| {
-		use frame_support::StorageMap;
-		sp_externalities::with_externalities(|ext| {
-			let key = frame_system::Account::<Runtime>::hashed_key_for(whale.clone());
-			let raw = ext.storage(&key).expect("account should be present");
-			let acc = AccountInfo::<u32, u8, pallet_balances::AccountData<u128>>::decode(&mut &raw[..]);
-			assert!(acc.is_ok());
-		})
-	});
 
+	// we'll be needing this
 	let wasm = polkadot_runtime::WASM_BINARY.expect("WASM runtime needs to be available.").to_vec();
 
+	// and these
 	let (technical_collective, council_collective) = test.with_state(|| {
 		(
 			pallet_collective::Members::<Runtime, TechnicalCollective>::get(),
@@ -316,22 +165,30 @@ fn runtime_upgrade() {
 	});
 
 	let call = SystemCall::set_code(wasm.clone()).encode();
-	// note pre-image
+	// note the call (pre-image?) of the proposal
 	test.send_extrinsic(DemocracyCall::note_preimage(call.clone()), whale.clone()).unwrap();
 	log::info!("sent note_preimage extrinsic");
-
 	test.produce_blocks(1);
 
-	// submit external propose through council
-	let proposal_hash = sp_core::hashing::blake2_256(&call[..]);
-	log::info!("hashed proposal");
-	let external_propose = DemocracyCall::external_propose(proposal_hash.clone().into());
+	// fetch proposal hash from event emitted by the runtime
+	let events = test.with_state(|| frame_system::Events::<Runtime>::get());
+	let proposal_hash = events.into_iter()
+		.filter_map(|event| match event.event {
+			Event::pallet_democracy(pallet_democracy::RawEvent::PreimageNoted(proposal_hash, _, _)) => Some(proposal_hash),
+			_ => None
+		})
+		.next()
+		.unwrap();
+
+	// submit proposal call through council
+	let external_propose = DemocracyCall::external_propose_majority(proposal_hash.clone().into());
 	let proposal_length = external_propose.using_encoded(|x| x.len()) as u32 + 1;
 	let proposal_weight = external_propose.get_dispatch_info().weight;
 	let proposal = CouncilCollectiveCall::propose(council_collective.len() as u32, Box::new(external_propose.clone().into()), proposal_length);
 	test.send_extrinsic(proposal.clone(), council_collective[0].clone()).unwrap();
 	test.produce_blocks(1);
 
+	// fetch proposal index from event emitted by the runtime
 	let events = test.with_state(|| frame_system::Events::<Runtime>::get());
 	let (council_proposal_index, council_proposal_hash) = events.into_iter()
 		.filter_map(|event| {
@@ -343,7 +200,6 @@ fn runtime_upgrade() {
 		.next()
 		.unwrap();
 
-	// TODO: fetch proposal index from logs
 	// vote
 	for member in &council_collective[1..] {
 		test.send_extrinsic(
@@ -357,12 +213,12 @@ fn runtime_upgrade() {
 	test.send_extrinsic(
 		CouncilCollectiveCall::close(council_proposal_hash, council_proposal_index, proposal_weight, proposal_length),
 		council_collective[0].clone()
-	);
+	).unwrap();
 	test.produce_blocks(1);
 
 	// assert that proposal has been passed on chain
-	let events = test.with_state(|| frame_system::Events::<Runtime>::get());
-	let events = events.into_iter()
+	let events = test.with_state(|| frame_system::Events::<Runtime>::get())
+		.into_iter()
 		.filter(|event| {
 			match event.event {
 				Event::pallet_collective_Instance1(pallet_collective::RawEvent::Closed(_, _, _)) |
@@ -376,7 +232,7 @@ fn runtime_upgrade() {
 	// make sure all 3 events are in state
 	assert_eq!(events.len(), 3);
 
-	// next technical collective must fast track.
+	// next technical collective must fast track the proposal.
 	let fast_track = DemocracyCall::fast_track(proposal_hash.into(), FastTrackVotingPeriod::get(), 0);
 	let proposal_weight = fast_track.get_dispatch_info().weight;
 	let fast_track_length = fast_track.using_encoded(|x| x.len()) as u32 + 1;
@@ -384,7 +240,7 @@ fn runtime_upgrade() {
 	test.send_extrinsic(
 		proposal,
 		technical_collective[0].clone(),
-	);
+	).unwrap();
 	test.produce_blocks(1);
 
 	let events = test.with_state(|| frame_system::Events::<Runtime>::get());
@@ -412,66 +268,48 @@ fn runtime_upgrade() {
 	test.send_extrinsic(
 		TechnicalCollectiveCall::close(technical_proposal_hash, technical_proposal_index, proposal_weight, fast_track_length),
 		technical_collective[0].clone()
-	);
+	).unwrap();
 	test.produce_blocks(1);
+
+	// assert that proposal has been passed on chain
+	let events = test
+		.with_state(|| frame_system::Events::<Runtime>::get())
+		.into_iter()
+		.filter(|event| {
+			match event.event {
+				Event::pallet_collective_Instance2(pallet_collective::RawEvent::Closed(_, _, _)) |
+				Event::pallet_collective_Instance2(pallet_collective::RawEvent::Approved(_)) |
+				Event::pallet_collective_Instance2(pallet_collective::RawEvent::Executed(_, Ok(()))) => true,
+				_ => false,
+			}
+		})
+		.collect::<Vec<_>>();
+
+	// make sure all 3 events are in state
+	assert_eq!(events.len(), 3);
+
+	// wait for fast track period.
+	test.produce_blocks(FastTrackVotingPeriod::get() as usize);
 
 	test.with_state(|| {
 		log::info!("\n\n{:#?}\n\n", frame_system::Events::<Runtime>::get())
 	});
 
-	// assert that proposal has been passed on chain
-	// let events = test.with_state(|| frame_system::Events::<Runtime>::get());
-	// let events = events.into_iter()
-	// 	.filter(|event| {
-	// 		match event.event {
-	// 			Event::pallet_collective_Instance2(RawEvent::Closed(_, _, _)) |
-	// 			Event::pallet_collective_Instance2(RawEvent::Approved(_)) |
-	// 			Event::pallet_collective_Instance2(RawEvent::Executed(_, Ok(()))) => true,
-	// 			_ => false,
-	// 		}
-	// 	});
-	//
-	// // make sure all 3 events are in state
-	// assert_eq!(events.len() > 3);
+	let event = test.with_state(|| frame_system::Events::<Runtime>::get())
+		.into_iter()
+		.find(|event| {
+			match event.event {
+				Event::frame_system(frame_system::RawEvent::CodeUpdated) => true,
+				_ => false,
+			}
+		});
 
-	// // wait for fast track period.
-	// test.produce_blocks(FastTrackVotingPeriod::get() as usize);
-	//
-	// // TODO: assert runtime upgraded event in logs
-	//
-	// test.produce_blocks(1);
-	//
-	// test.with_state(|| {
-	// 	use new_frame_support::StorageMap;
-	//
-	// 	let new_whale = new_sp_core::crypto::AccountId32::from_str("12dfEn1GycUmHtfEDW3BuQYzsMyUR1PqUPH2pyEikYeUX59o").unwrap();
-	//
-	// 	sp_externalities::with_externalities(|ext| {
-	// 		let new_key = new_frame_system::Account::<new_polkadot_runtime::Runtime>::hashed_key_for(new_whale.clone());
-	// 		let new_raw = ext.storage(&new_key).expect("account should be present");
-	// 		let new_acc = new_frame_system::AccountInfo::<u32, new_pallet_balances::AccountData<u128>>::decode(&mut &new_raw[..]);
-	// 		println!("acc new: {:?}", new_acc);
-	// 		assert!(new_acc.is_ok())
-	//
-	// 	}).expect("externalities should be present");
-	// });
-	//
-	// test.revert_blocks(8 + FastTrackVotingPeriod::get() as _).expect("final reverting failed");
-	test.revert_blocks(7).expect("final reverting failed");
+	// make sure events are in state
+	assert!(event.is_some());
+
+	// TODO: assert runtime upgraded event in logs
+
+	test.produce_blocks(1);
+	test.revert_blocks(8 + FastTrackVotingPeriod::get()).expect("final reverting failed");
 }
 
-#[test]
-fn elections_migration() {}
-
-#[test]
-fn external_black_box() {
-	let test = test::blackbox_external::<Node>("ws://127.0.0.1:3001");
-	test.wait_blocks(5_u32);
-}
-
-// Check state using decl_storage
-// Assert a log line
-// Initially start with a "runtime example"
-// Customize the runtime somehow
-//  $ cp node/runtime /tmp/temp_runtime
-//  $ sed -../
