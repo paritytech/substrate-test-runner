@@ -1,6 +1,6 @@
 use manual_seal::consensus::{babe::BabeConsensusDataProvider, ConsensusDataProvider};
 use parity_scale_codec::alloc::sync::Arc;
-use polkadot_runtime::{Runtime, SignedExtra, FastTrackVotingPeriod, Event};
+use polkadot_runtime::{Runtime, SignedExtra, FastTrackVotingPeriod, Event, Call};
 use polkadot_service::{chain_spec::polkadot_development_config_genesis, PolkadotChainSpec};
 use sc_consensus_babe::BabeBlockImport;
 use sc_finality_grandpa::GrandpaBlockImport;
@@ -142,9 +142,7 @@ fn runtime_upgrade() {
 	use frame_support::StorageValue;
 	use polkadot_runtime::{CouncilCollective, TechnicalCollective};
 
-	let mut test = test::deterministic::<Node>();
-	test.revert_blocks(FastTrackVotingPeriod::get()).expect("final reverting failed");
-	log::info!("wiped blocks");
+	let mut node = test::deterministic::<Node>();
 
 	type SystemCall = frame_system::Call<Runtime>;
 	type DemocracyCall = pallet_democracy::Call<Runtime>;
@@ -160,7 +158,7 @@ fn runtime_upgrade() {
 		.map(|account| AccountId32::from_str(account).unwrap())
 		.collect::<Vec<_>>();
 
-	test.with_state(|| {
+	node.with_state(|| {
 		for whale in &whales {
 			log::info!("\n\n{:?}: {:#?}\n\n", whale, pallet_balances::Module::<Runtime>::free_balance(whale))
 		}
@@ -170,41 +168,51 @@ fn runtime_upgrade() {
 	let wasm = polkadot_runtime::WASM_BINARY.expect("WASM runtime needs to be available.").to_vec();
 
 	// and these
-	let (technical_collective, council_collective) = test.with_state(|| (
+	let (technical_collective, council_collective) = node.with_state(|| (
 		pallet_collective::Members::<Runtime, TechnicalCollective>::get(),
 		pallet_collective::Members::<Runtime, CouncilCollective>::get()
 	));
 
-	let call = SystemCall::set_code(wasm.clone()).encode();
+	let call = Call::System(SystemCall::set_code(wasm.clone()));
 	// note the call (pre-image?) of the runtime upgrade proposal
-	test.send_extrinsic(DemocracyCall::note_preimage(call.clone()), whales[0].clone());
-	test.produce_blocks(1);
+	node.send_extrinsic(DemocracyCall::note_preimage(call.encode()), whales[0].clone());
+	node.produce_blocks(1);
 
 	// fetch proposal hash from event emitted by the runtime
-	let events = test.with_state(|| frame_system::Events::<Runtime>::get());
+	let events = node.with_state(|| frame_system::Events::<Runtime>::get());
 	let proposal_hash = events.into_iter()
 		.filter_map(|event| match event.event {
-			Event::pallet_democracy(pallet_democracy::RawEvent::PreimageNoted(proposal_hash, _, _)) => Some(proposal_hash),
+			Event::pallet_democracy(
+				pallet_democracy::RawEvent::PreimageNoted(proposal_hash, _, _)
+			) => Some(proposal_hash),
 			_ => None
 		})
 		.next()
 		.unwrap();
 
-	// submit external_propose call through council
+	log::info!("\n\n\n{:?}\n\n\n", proposal_hash);
+
+	// submit external_propose call through council 0x9fae48758cbf18953f70e28ab5939491770a0354c943bdf6ff6d25ebc01bbd36
 	let external_propose = DemocracyCall::external_propose_majority(proposal_hash.clone().into());
 	let proposal_length = external_propose.using_encoded(|x| x.len()) as u32 + 1;
 	let proposal_weight = external_propose.get_dispatch_info().weight;
-	let proposal = CouncilCollectiveCall::propose(council_collective.len() as u32, Box::new(external_propose.clone().into()), proposal_length);
+	let proposal = CouncilCollectiveCall::propose(
+		council_collective.len() as u32,
+		Box::new(external_propose.clone().into()),
+		proposal_length
+	);
 
-	test.send_extrinsic(proposal.clone(), council_collective[0].clone());
-	test.produce_blocks(1);
+	node.send_extrinsic(proposal.clone(), council_collective[0].clone());
+	node.produce_blocks(1);
 
 	// fetch proposal index from event emitted by the runtime
-	let events = test.with_state(|| frame_system::Events::<Runtime>::get());
+	let events = node.with_state(|| frame_system::Events::<Runtime>::get());
 	let (council_proposal_index, council_proposal_hash) = events.into_iter()
 		.filter_map(|event| {
 			match event.event {
-				Event::pallet_collective_Instance1(pallet_collective::RawEvent::Proposed(_, index, proposal_hash, _)) => Some((index, proposal_hash)),
+				Event::pallet_collective_Instance1(
+					pallet_collective::RawEvent::Proposed(_, index, proposal_hash, _)
+				) => Some((index, proposal_hash)),
 				_ => None
 			}
 		})
@@ -214,17 +222,17 @@ fn runtime_upgrade() {
 	// vote
 	for member in &council_collective[1..] {
 		let call = CouncilCollectiveCall::vote(council_proposal_hash.clone(), council_proposal_index, true);
-		test.send_extrinsic(call, member.clone());
+		node.send_extrinsic(call, member.clone());
 	}
-	test.produce_blocks(1);
+	node.produce_blocks(1);
 
 	// close vote
 	let call = CouncilCollectiveCall::close(council_proposal_hash, council_proposal_index, proposal_weight, proposal_length);
-	test.send_extrinsic(call, council_collective[0].clone());
-	test.produce_blocks(1);
+	node.send_extrinsic(call, council_collective[0].clone());
+	node.produce_blocks(1);
 
 	// assert that proposal has been passed on chain
-	let events = test.with_state(|| frame_system::Events::<Runtime>::get())
+	let events = node.with_state(|| frame_system::Events::<Runtime>::get())
 		.into_iter()
 		.filter(|event| {
 			match event.event {
@@ -243,16 +251,22 @@ fn runtime_upgrade() {
 	let fast_track = DemocracyCall::fast_track(proposal_hash.into(), FastTrackVotingPeriod::get(), 0);
 	let proposal_weight = fast_track.get_dispatch_info().weight;
 	let fast_track_length = fast_track.using_encoded(|x| x.len()) as u32 + 1;
-	let proposal = TechnicalCollectiveCall::propose(technical_collective.len() as u32, Box::new(fast_track.into()), fast_track_length);
+	let proposal = TechnicalCollectiveCall::propose(
+		technical_collective.len() as u32,
+		Box::new(fast_track.into()),
+		fast_track_length
+	);
 
-	test.send_extrinsic(proposal, technical_collective[0].clone());
-	test.produce_blocks(1);
+	node.send_extrinsic(proposal, technical_collective[0].clone());
+	node.produce_blocks(1);
 
-	let events = test.with_state(|| frame_system::Events::<Runtime>::get());
+	let events = node.with_state(|| frame_system::Events::<Runtime>::get());
 	let (technical_proposal_index, technical_proposal_hash) = events.into_iter()
 		.filter_map(|event| {
 			match event.event {
-				Event::pallet_collective_Instance2(pallet_collective::RawEvent::Proposed(_, index, hash, _)) => Some((index, hash)),
+				Event::pallet_collective_Instance2(
+					pallet_collective::RawEvent::Proposed(_, index, hash, _)
+				) => Some((index, hash)),
 				_ => None
 			}
 		})
@@ -262,19 +276,23 @@ fn runtime_upgrade() {
 	// vote
 	for member in &technical_collective[1..] {
 		let call = TechnicalCollectiveCall::vote(technical_proposal_hash.clone(), technical_proposal_index, true);
-		test.send_extrinsic(call, member.clone());
+		node.send_extrinsic(call, member.clone());
 	}
-	test.produce_blocks(1);
+	node.produce_blocks(1);
 
 	// close vote
-	let call = TechnicalCollectiveCall::close(technical_proposal_hash, technical_proposal_index, proposal_weight, fast_track_length);
-	test.send_extrinsic(call, technical_collective[0].clone());
-	test.produce_blocks(1);
+	let call = TechnicalCollectiveCall::close(
+		technical_proposal_hash,
+		technical_proposal_index,
+		proposal_weight,
+		fast_track_length,
+	);
+	node.send_extrinsic(call, technical_collective[0].clone());
+	node.produce_blocks(1);
 
 	// assert that fast-track proposal has been passed on chain
-	let events = test.with_state(|| frame_system::Events::<Runtime>::get());
-	let collective_events = events.clone()
-		.into_iter()
+	let events = node.with_state(|| frame_system::Events::<Runtime>::get());
+	let collective_events = events.iter()
 		.filter(|event| {
 			match event.event {
 				Event::pallet_collective_Instance2(pallet_collective::RawEvent::Closed(_, _, _)) |
@@ -305,29 +323,28 @@ fn runtime_upgrade() {
 		}
 	);
 	for whale in whales {
-		test.send_extrinsic(call.clone(), whale);
+		node.send_extrinsic(call.clone(), whale);
 	}
 
 	// wait for fast track period.
-	test.produce_blocks(FastTrackVotingPeriod::get() as usize);
-
-	test.with_state(|| {
-		log::info!("\n\n{:#?}\n\n", frame_system::Events::<Runtime>::get())
-	});
+	node.produce_blocks(FastTrackVotingPeriod::get() as usize);
 
 	// assert that the runtime is upgraded by looking at events
-	let event = test.with_state(|| frame_system::Events::<Runtime>::get())
+	let events = node.with_state(|| frame_system::Events::<Runtime>::get())
 		.into_iter()
 		.find(|event| {
 			match event.event {
-				Event::frame_system(frame_system::RawEvent::CodeUpdated) => true,
+				Event::frame_system(frame_system::RawEvent::CodeUpdated) |
+				Event::pallet_democracy(pallet_democracy::RawEvent::Passed(_)) |
+				Event::pallet_democracy(pallet_democracy::RawEvent::PreimageUsed(_, _, _)) |
+				Event::pallet_democracy(pallet_democracy::RawEvent::Executed(_, true)) => true,
 				_ => false,
 			}
 		});
 
 	// make sure event is in state
-	// assert!(event.is_some());
+	assert_eq!(events.len(), 4);
 
-	test.revert_blocks(8 + FastTrackVotingPeriod::get()).expect("final reverting failed");
+	node.revert_blocks(8 + FastTrackVotingPeriod::get()).expect("final reverting failed");
 }
 
