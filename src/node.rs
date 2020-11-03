@@ -33,13 +33,9 @@ use sp_runtime::generic::BlockId;
 use sp_transaction_pool::TransactionPool;
 use sp_runtime::transaction_validity::TransactionSource;
 
-mod extensions;
 pub mod utils;
 
-pub use self::{
-	extensions::ExtensionFactory,
-	utils::{build_config, build_logger, StateProvider},
-};
+pub use self::utils::{build_config, build_logger, StateProvider};
 use sp_runtime::MultiSignature;
 
 /// This holds a reference to a running node on another thread,
@@ -116,10 +112,6 @@ impl<Node: TestRuntimeRequirements> InternalNode<Node> {
 			select_chain,
 			block_import,
 		) = Node::create_client_parts(&config)?;
-
-		client
-			.execution_extensions()
-			.set_extensions_factory(Box::new(ExtensionFactory));
 
 		let import_queue =
 			manual_seal::import_queue(Box::new(block_import.clone()), &task_manager.spawn_handle(), None);
