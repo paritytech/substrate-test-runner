@@ -68,6 +68,9 @@ sc-consensus-babe = { git = "https://github.com/paritytech/substrate.git", branc
 sc-consensus = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 sp-consensus-babe = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 frame-support = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-runtime-interface = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+sp-wasm-interface = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
+frame-benchmarking = { git = "https://github.com/paritytech/substrate.git", branch = "seun-babe-manual-seal" }
 
 polkadot-runtime = { git = "https://github.com/paritytech/polkadot.git", branch = "seun-babe-manual-seal" }
 polkadot-core-primitives = { git = "https://github.com/paritytech/polkadot.git", branch = "seun-babe-manual-seal" }

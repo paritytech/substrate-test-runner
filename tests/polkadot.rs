@@ -22,9 +22,71 @@ type BlockImport<B, BE, C, SC> = BabeBlockImport<B, C, GrandpaBlockImport<BE, B,
 
 struct Node;
 
+macro_rules! override_host_functions {
+    ($($fn_name:expr, $name:ident,)+) => {{
+        let mut host_functions = vec![];
+        $(
+
+            struct $name;
+            impl sp_wasm_interface::Function for $name {
+                fn name(&self) -> &str {
+                    &$fn_name
+                }
+
+                fn signature(&self) -> sp_wasm_interface::Signature {
+                    sp_wasm_interface::Signature {
+                        args: std::borrow::Cow::Owned(vec![
+                            sp_wasm_interface::ValueType::I32,
+                            sp_wasm_interface::ValueType::I64,
+                            sp_wasm_interface::ValueType::I32,
+                        ]),
+                        return_value: Some(sp_wasm_interface::ValueType::I32),
+                    }
+                }
+
+                fn execute(
+                    &self,
+                    context: &mut dyn sp_wasm_interface::FunctionContext,
+                    _args: &mut dyn Iterator<Item = sp_wasm_interface::Value>,
+                ) -> Result<Option<sp_wasm_interface::Value>, String> {
+                    <bool as sp_runtime_interface::host::IntoFFIValue>::into_ffi_value (true , context)
+                        .map(sp_wasm_interface::IntoValue::into_value)
+                        .map(Some)
+                }
+            }
+            host_functions.push(&$name as &'static dyn sp_wasm_interface::Function);
+        )+
+        host_functions
+   }};
+}
+
+pub struct CustomHostFunctions;
+
+impl sp_wasm_interface::HostFunctions for CustomHostFunctions {
+	fn host_functions() -> Vec<&'static dyn sp_wasm_interface::Function> {
+		use sp_wasm_interface::HostFunctions;
+		let mut host_functions = override_host_functions!(
+            "ext_crypto_ecdsa_verify_version_1", EcdsaVerify,
+            "ext_crypto_ed25519_verify_version_1", Ed25519Verify,
+            "ext_crypto_sr25519_verify_version_1", Sr25519Verify,
+            "ext_crypto_sr25519_verify_version_2", Sr25519VerifyV2,
+        );
+
+		host_functions.extend(frame_benchmarking::benchmarking::HostFunctions::host_functions());
+		host_functions
+	}
+}
+
+sc_executor::native_executor_instance!(
+	pub Executor,
+	polkadot_runtime::api::dispatch,
+	polkadot_runtime::native_version,
+	CustomHostFunctions,
+);
+
 impl TestRuntimeRequirements for Node {
 	type Block = polkadot_core_primitives::Block;
-	type Executor = polkadot_service::PolkadotExecutor;
+	type Executor = Executor;
 	type Runtime = polkadot_runtime::Runtime;
 	type RuntimeApi = polkadot_runtime::RuntimeApi;
 	type SelectChain = sc_consensus::LongestChain<TFullBackend<Self::Block>, Self::Block>;
