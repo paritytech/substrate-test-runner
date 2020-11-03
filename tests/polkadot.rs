@@ -241,7 +241,7 @@ fn runtime_upgrade() {
 	node.produce_blocks(1);
 
 	// fetch proposal hash from event emitted by the runtime
-	let events = node.with_state(|| frame_system::Events::<Runtime>::get());
+	let events = node.with_state(|| frame_system::Module::<Runtime>::events());
 	let proposal_hash = events.into_iter()
 		.filter_map(|event| match event.event {
 			Event::pallet_democracy(
@@ -268,7 +268,7 @@ fn runtime_upgrade() {
 	node.produce_blocks(1);
 
 	// fetch proposal index from event emitted by the runtime
-	let events = node.with_state(|| frame_system::Events::<Runtime>::get());
+	let events = node.with_state(|| frame_system::Module::<Runtime>::events());
 	let (council_proposal_index, council_proposal_hash) = events.into_iter()
 		.filter_map(|event| {
 			match event.event {
@@ -294,7 +294,7 @@ fn runtime_upgrade() {
 	node.produce_blocks(1);
 
 	// assert that proposal has been passed on chain
-	let events = node.with_state(|| frame_system::Events::<Runtime>::get())
+	let events = node.with_state(|| frame_system::Module::<Runtime>::events())
 		.into_iter()
 		.filter(|event| {
 			match event.event {
@@ -322,7 +322,7 @@ fn runtime_upgrade() {
 	node.send_extrinsic(proposal, technical_collective[0].clone());
 	node.produce_blocks(1);
 
-	let events = node.with_state(|| frame_system::Events::<Runtime>::get());
+	let events = node.with_state(|| frame_system::Module::<Runtime>::events());
 	let (technical_proposal_index, technical_proposal_hash) = events.into_iter()
 		.filter_map(|event| {
 			match event.event {
@@ -353,7 +353,7 @@ fn runtime_upgrade() {
 	node.produce_blocks(1);
 
 	// assert that fast-track proposal has been passed on chain
-	let events = node.with_state(|| frame_system::Events::<Runtime>::get());
+	let events = node.with_state(|| frame_system::Module::<Runtime>::events());
 	let collective_events = events.iter()
 		.filter(|event| {
 			match event.event {
@@ -392,7 +392,7 @@ fn runtime_upgrade() {
 	node.produce_blocks(FastTrackVotingPeriod::get() as usize);
 
 	// assert that the runtime is upgraded by looking at events
-	let events = node.with_state(|| frame_system::Events::<Runtime>::get())
+	let events = node.with_state(|| frame_system::Module::<Runtime>::events())
 		.into_iter()
 		.filter(|event| {
 			match event.event {
