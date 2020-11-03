@@ -332,7 +332,7 @@ fn runtime_upgrade() {
 	// assert that the runtime is upgraded by looking at events
 	let events = node.with_state(|| frame_system::Events::<Runtime>::get())
 		.into_iter()
-		.find(|event| {
+		.filter(|event| {
 			match event.event {
 				Event::frame_system(frame_system::RawEvent::CodeUpdated) |
 				Event::pallet_democracy(pallet_democracy::RawEvent::Passed(_)) |
@@ -340,7 +340,8 @@ fn runtime_upgrade() {
 				Event::pallet_democracy(pallet_democracy::RawEvent::Executed(_, true)) => true,
 				_ => false,
 			}
-		});
+		})
+		.collect::<Vec<_>>();
 
 	// make sure event is in state
 	assert_eq!(events.len(), 4);
