@@ -1,13 +1,13 @@
 #![deny(unused_crate_dependencies)]
-use sc_executor::NativeExecutionDispatch;
-use sp_api::{ConstructRuntimeApi, TransactionFor};
-use sc_service::{TFullClient, ChainSpec, Configuration, TFullBackend, TaskManager};
-use sp_consensus::{SelectChain, BlockImport};
-use sp_runtime::traits::{SignedExtension, Block as BlockT};
-use std::sync::Arc;
-use sp_keystore::SyncCryptoStorePtr;
 use manual_seal::consensus::ConsensusDataProvider;
+use sc_executor::NativeExecutionDispatch;
+use sc_service::{ChainSpec, Configuration, TFullBackend, TFullClient, TaskManager};
+use sp_api::{ConstructRuntimeApi, TransactionFor};
+use sp_consensus::{BlockImport, SelectChain};
 use sp_inherents::InherentDataProviders;
+use sp_keystore::SyncCryptoStorePtr;
+use sp_runtime::traits::{Block as BlockT, SignedExtension};
+use std::sync::Arc;
 
 mod node;
 mod utils;
@@ -27,22 +27,22 @@ pub trait TestRequirements: Sized {
 
 	/// RuntimeApi
 	type RuntimeApi: Send
-	+ Sync
-	+ 'static
-	+ ConstructRuntimeApi<Self::Block, TFullClient<Self::Block, Self::RuntimeApi, Self::Executor>>;
+		+ Sync
+		+ 'static
+		+ ConstructRuntimeApi<Self::Block, TFullClient<Self::Block, Self::RuntimeApi, Self::Executor>>;
 
 	/// select chain type.
 	type SelectChain: SelectChain<Self::Block> + 'static;
 
 	/// Block import type.
 	type BlockImport: Send
-	+ Sync
-	+ Clone
-	+ BlockImport<
-		Self::Block,
-		Error = sp_consensus::Error,
-		Transaction = TransactionFor<TFullClient<Self::Block, Self::RuntimeApi, Self::Executor>, Self::Block>,
-	> + 'static;
+		+ Sync
+		+ Clone
+		+ BlockImport<
+			Self::Block,
+			Error = sp_consensus::Error,
+			Transaction = TransactionFor<TFullClient<Self::Block, Self::RuntimeApi, Self::Executor>, Self::Block>,
+		> + 'static;
 
 	type SignedExtras: SignedExtension;
 

@@ -3,29 +3,26 @@ use std::{cell::RefCell, sync::Arc};
 use futures::{FutureExt, SinkExt};
 use jsonrpc_core::MetaIoHandler;
 use jsonrpc_core_client::{transports::local, RpcChannel};
-use manual_seal::{run_manual_seal, ManualSealParams, EngineCommand};
+use manual_seal::{run_manual_seal, EngineCommand, ManualSealParams};
+use parity_scale_codec::Encode;
 use sc_cli::build_runtime;
 use sc_client_api::{backend, backend::Backend, CallExecutor, ExecutorProvider};
 use sc_service::{
-	build_network, spawn_tasks, BuildNetworkParams, SpawnTasksParams,
-	TFullBackend, TFullClient, TaskManager, TaskType, TFullCallExecutor,
+	build_network, spawn_tasks, BuildNetworkParams, SpawnTasksParams, TFullBackend, TFullCallExecutor, TFullClient,
+	TaskManager, TaskType,
 };
 use sc_transaction_pool::BasicPool;
-use sp_api::{
-	ApiErrorExt, ApiExt, ConstructRuntimeApi, Core, Metadata,
-	OverlayedChanges, StorageTransactionCache,
-};
+use sp_api::{ApiErrorExt, ApiExt, ConstructRuntimeApi, Core, Metadata, OverlayedChanges, StorageTransactionCache};
 use sp_block_builder::BlockBuilder;
+use sp_blockchain::HeaderBackend;
+use sp_core::{offchain::storage::OffchainOverlayedChanges, ExecutionContext};
 use sp_offchain::OffchainWorkerApi;
 use sp_runtime::traits::{Block as BlockT, Extrinsic};
-use sp_session::SessionKeys;
+use sp_runtime::{generic::BlockId, transaction_validity::TransactionSource, MultiSignature};
 use sp_runtime::{generic::UncheckedExtrinsic, traits::NumberFor};
-use parity_scale_codec::Encode;
+use sp_session::SessionKeys;
 use sp_state_machine::Ext;
 use sp_transaction_pool::runtime_api::TaggedTransactionQueue;
-use sp_blockchain::HeaderBackend;
-use sp_core::{ExecutionContext, offchain::storage::OffchainOverlayedChanges};
-use sp_runtime::{generic::BlockId, transaction_validity::TransactionSource, MultiSignature};
 use sp_transaction_pool::TransactionPool;
 
 pub use crate::utils::{config, logger};
@@ -48,15 +45,17 @@ pub struct Node<T: TestRequirements> {
 	/// client instance
 	client: Arc<TFullClient<T::Block, T::RuntimeApi, T::Executor>>,
 	/// transaction pool
-	pool: Arc<dyn TransactionPool<
-		Block = T::Block,
-		Hash = <T::Block as BlockT>::Hash,
-		Error = sc_transaction_pool::error::Error,
-		InPoolTransaction = sc_transaction_graph::base_pool::Transaction<
-			<T::Block as BlockT>::Hash,
-			<T::Block as BlockT>::Extrinsic
-		>
-	>>,
+	pool: Arc<
+		dyn TransactionPool<
+			Block = T::Block,
+			Hash = <T::Block as BlockT>::Hash,
+			Error = sc_transaction_pool::error::Error,
+			InPoolTransaction = sc_transaction_graph::base_pool::Transaction<
+				<T::Block as BlockT>::Hash,
+				<T::Block as BlockT>::Extrinsic,
+			>,
+		>,
+	>,
 	/// channel to communicate with manual seal on.
 	manual_seal_command_sink: futures::channel::mpsc::Sender<EngineCommand<<T::Block as BlockT>::Hash>>,
 	/// backend type.
@@ -67,17 +66,15 @@ impl<T: TestRequirements> Node<T> {
 	/// Starts a node with the manual-seal authorship,
 	pub fn new() -> Result<Self, sc_service::Error>
 	where
-		<T::RuntimeApi as ConstructRuntimeApi<
-			T::Block,
-			TFullClient<T::Block, T::RuntimeApi, T::Executor>,
-		>>::RuntimeApi: Core<T::Block>
-			+ Metadata<T::Block>
-			+ OffchainWorkerApi<T::Block>
-			+ SessionKeys<T::Block>
-			+ TaggedTransactionQueue<T::Block>
-			+ BlockBuilder<T::Block>
-			+ ApiErrorExt<Error = sp_blockchain::Error>
-			+ ApiExt<T::Block, StateBackend = <TFullBackend<T::Block> as Backend<T::Block>>::State>,
+		<T::RuntimeApi as ConstructRuntimeApi<T::Block, TFullClient<T::Block, T::RuntimeApi, T::Executor>>>::RuntimeApi:
+			Core<T::Block>
+				+ Metadata<T::Block>
+				+ OffchainWorkerApi<T::Block>
+				+ SessionKeys<T::Block>
+				+ TaggedTransactionQueue<T::Block>
+				+ BlockBuilder<T::Block>
+				+ ApiErrorExt<Error = sp_blockchain::Error>
+				+ ApiExt<T::Block, StateBackend = <TFullBackend<T::Block> as Backend<T::Block>>::State>,
 	{
 		let compat_runtime = tokio_compat::runtime::Runtime::new().unwrap();
 		let tokio_runtime = build_runtime().unwrap();
@@ -208,20 +205,22 @@ impl<T: TestRequirements> Node<T> {
 
 	/// Executes closure in an externalities provided environment.
 	pub fn with_state<R>(&self, closure: impl FnOnce() -> R) -> R
-		where
-			<TFullCallExecutor<T::Block, T::Executor> as CallExecutor<T::Block>>::Error: std::fmt::Debug,
+	where
+		<TFullCallExecutor<T::Block, T::Executor> as CallExecutor<T::Block>>::Error: std::fmt::Debug,
 	{
 		let id = BlockId::Hash(self.client.info().best_hash);
 		let mut offchain_overlay = OffchainOverlayedChanges::disabled();
 		let mut overlay = OverlayedChanges::default();
 		let changes_trie = backend::changes_tries_state_at_block(&id, self.backend.changes_trie_storage()).unwrap();
-		let mut cache = StorageTransactionCache::<
-			T::Block,
-			<TFullBackend<T::Block> as Backend<T::Block>>::State,
-		>::default();
-		let mut extensions = self.client.execution_extensions()
+		let mut cache =
+			StorageTransactionCache::<T::Block, <TFullBackend<T::Block> as Backend<T::Block>>::State>::default();
+		let mut extensions = self
+			.client
+			.execution_extensions()
 			.extensions(&id, ExecutionContext::BlockConstruction);
-		let state_backend = self.backend.state_at(id.clone())
+		let state_backend = self
+			.backend
+			.state_at(id.clone())
 			.expect(&format!("State at block {} not found", id));
 
 		let mut ext = Ext::new(
@@ -250,8 +249,8 @@ impl<T: TestRequirements> Node<T> {
 				<T::Runtime as frame_system::Trait>::Call,
 				MultiSignature,
 				T::SignedExtras,
-			>
-		>
+			>,
+		>,
 	{
 		let extra = self.with_state(|| T::signed_extras(from.clone()));
 		let signed_data = Some((from, Default::default(), extra));
@@ -266,7 +265,10 @@ impl<T: TestRequirements> Node<T> {
 
 		self.compat_runtime()
 			.borrow_mut()
-			.block_on_std(self.pool.submit_one(&BlockId::Hash(at), TransactionSource::Local, ext.into()))
+			.block_on_std(
+				self.pool
+					.submit_one(&BlockId::Hash(at), TransactionSource::Local, ext.into()),
+			)
 			.unwrap()
 	}
 
@@ -289,15 +291,14 @@ impl<T: TestRequirements> Node<T> {
 	pub fn seal_blocks(&mut self, num: usize) {
 		let mut tokio = self._compat_runtime.borrow_mut();
 		for count in 0..num {
-			let future = self.manual_seal_command_sink
-				.send(EngineCommand::SealNewBlock {
-					create_empty: true,
-					finalize: false,
-					parent_hash: None,
-					sender: None,
-				});
+			let future = self.manual_seal_command_sink.send(EngineCommand::SealNewBlock {
+				create_empty: true,
+				finalize: false,
+				parent_hash: None,
+				sender: None,
+			});
 
-				tokio.block_on_std(future).expect("block production failed: ");
+			tokio.block_on_std(future).expect("block production failed: ");
 			log::info!("sealed {} of {} blocks", count + 1, num)
 		}
 	}
@@ -316,8 +317,7 @@ impl<T: TestRequirements> Node<T> {
 
 	/// Revert count number of blocks from the chain
 	pub fn revert_blocks(&self, count: NumberFor<T::Block>) {
-		self.backend.revert(count, true)
-			.expect("Failed to revert blocks: ");
+		self.backend.revert(count, true).expect("Failed to revert blocks: ");
 	}
 
 	/// provides access to the tokio compat runtime.
