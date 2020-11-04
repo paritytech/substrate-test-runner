@@ -1,4 +1,3 @@
-use super::TestRuntimeRequirements;
 use sc_service::{TaskExecutor, Configuration, BasePath, Role, DatabaseConfig};
 use sp_keyring::Sr25519Keyring;
 use sc_network::{multiaddr, config::{NetworkConfiguration, TransportConfig}};
@@ -9,17 +8,12 @@ use sc_client_api::execution_extensions::ExecutionStrategies;
 use futures::{Sink, SinkExt};
 use std::fmt;
 use std::io::Write;
-
-/// Provides access to state.
-pub trait StateProvider {
-    /// executes closure in an externalities provided environment.
-    fn with_state<R>(&self, closure: impl FnOnce() -> R) -> R;
-}
+use crate::TestRequirements;
 
 /// Used to create `Configuration` object for the node.
-pub fn build_config<Node>(task_executor: TaskExecutor) -> Configuration
+pub fn config<Node>(task_executor: TaskExecutor) -> Configuration
     where
-        Node: TestRuntimeRequirements,
+        Node: TestRequirements,
 {
     let mut chain_spec = Node::load_spec().expect("failed to load chain specification");
     let base_path = if let Some(base) = Node::base_path() {
@@ -114,7 +108,7 @@ pub fn build_config<Node>(task_executor: TaskExecutor) -> Configuration
 }
 
 /// Builds the global logger.
-pub fn build_logger<LogSink>(executor: tokio::runtime::Handle, log_sink: LogSink)
+pub fn logger<LogSink>(executor: tokio::runtime::Handle, log_sink: LogSink)
     where
         LogSink: Sink<String> + Clone + Unpin + Send + Sync + 'static,
         LogSink::Error: Send + Sync + fmt::Debug,
