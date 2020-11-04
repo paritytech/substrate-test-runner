@@ -48,14 +48,14 @@ jobs:
           args:                    --all  --verbose
 
 ## Linting Stage
-      - name:                      Add clippy
-        run:                       rustup component add clippy --toolchain $NIGHTLY
-      - name:                      Clippy
-        uses:                      actions-rs/cargo@master
-        with:
-          command:                 clippy
-          toolchain:               nightly-2020-10-04
-          args:                    --all-targets -- -D warnings
+# - name:                      Add clippy
+#   run:                       rustup component add clippy --toolchain $NIGHTLY
+# - name:                      Clippy
+#   uses:                      actions-rs/cargo@master
+#   with:
+#     command:                 clippy
+#     toolchain:               nightly-2020-10-04
+#     args:                    --all-targets -- -D warnings
 
 ## Build Stage
       - name:                      Building rust-stable
