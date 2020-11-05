@@ -49,9 +49,9 @@ pub trait TestRequirements: Sized {
 	/// chain spec factory
 	fn load_spec() -> Result<Box<dyn ChainSpec>, String>;
 
-	/// provide a path to an existing db
-	fn base_path() -> Option<&'static str> {
-		None
+	/// Get polkadot base path from env.
+	fn base_path() -> Option<String> {
+		std::env::var("POLKADOT_BASE_PATH").ok()
 	}
 
 	/// Signed extras, this function is caled in an externalities provided environment.

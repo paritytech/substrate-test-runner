@@ -60,6 +60,8 @@ pub struct Node<T: TestRequirements> {
 	manual_seal_command_sink: futures::channel::mpsc::Sender<EngineCommand<<T::Block as BlockT>::Hash>>,
 	/// backend type.
 	backend: Arc<TFullBackend<T::Block>>,
+	/// Block number at initialization of this Node.
+	initial_block_number: NumberFor<T::Block>
 }
 
 impl<T: TestRequirements> Node<T> {
@@ -179,6 +181,7 @@ impl<T: TestRequirements> Node<T> {
 
 		network_starter.start_network();
 		let rpc_handler = rpc_handlers.io_handler();
+		let initial_number = client.info().best_number;
 
 		Ok(Self {
 			rpc_handler,
@@ -190,6 +193,7 @@ impl<T: TestRequirements> Node<T> {
 			backend,
 			log_stream,
 			manual_seal_command_sink: command_sink,
+			initial_block_number: initial_number,
 		})
 	}
 
@@ -333,6 +337,11 @@ impl<T: TestRequirements> Node<T> {
 
 impl<T: TestRequirements> Drop for Node<T> {
 	fn drop(&mut self) {
+        // if a db path was specified, revert all blocks we've added
+		if let Some(_) = T::base_path() {
+			let diff = self.client.info().best_number - self.initial_block_number;
+			self.revert_blocks(diff);
+		}
 		if let Some(mut task_manager) = self._task_manager.take() {
 			// if this isn't called the node will live forever
 			task_manager.terminate()
