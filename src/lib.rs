@@ -1,4 +1,3 @@
-#![deny(unused_crate_dependencies)]
 use manual_seal::consensus::ConsensusDataProvider;
 use sc_executor::NativeExecutionDispatch;
 use sc_service::{ChainSpec, Configuration, TFullBackend, TFullClient, TaskManager};
@@ -11,7 +10,9 @@ use std::sync::Arc;
 
 mod node;
 mod utils;
+mod host_functions;
 
+pub use host_functions::*;
 pub use node::*;
 
 /// Wrapper trait for concrete type required by this testing framework.

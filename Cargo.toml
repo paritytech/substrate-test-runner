@@ -1,7 +1,7 @@
 [package]
 name = "substrate-test-runner"
 version = "0.1.0"
-authors = ["Tomasz Drwięga <tomusdrw@gmail.com>"]
+authors = ["Tomasz Drwięga <tomusdrw@gmail.com>", "Seun Lanlege <seunlanlege@gmail.com>"]
 edition = "2018"
 
 [dependencies]
@@ -19,8 +19,6 @@ sc-client-api = { git = "https://github.com/paritytech/substrate.git", rev = "f7
 sc-rpc-server = { git = "https://github.com/paritytech/substrate.git", rev = "f7a8b10" }
 manual-seal = { package = "sc-consensus-manual-seal", git = "https://github.com/paritytech/substrate.git", rev = "f7a8b10" }
 
-
-
 # primitive deps
 sp-core = { git = "https://github.com/paritytech/substrate.git", rev = "f7a8b10" }
 sp-blockchain = { git = "https://github.com/paritytech/substrate.git", rev = "f7a8b10" }
@@ -36,6 +34,8 @@ sp-inherents = { git = "https://github.com/paritytech/substrate.git", rev = "f7a
 sp-keyring = { git = "https://github.com/paritytech/substrate.git", rev = "f7a8b10" }
 sp-externalities = { git = "https://github.com/paritytech/substrate.git", rev = "f7a8b10" }
 sp-state-machine = { git = "https://github.com/paritytech/substrate.git", rev = "f7a8b10" }
+sp-wasm-interface = { git = "https://github.com/paritytech/substrate.git", rev = "f7a8b10" }
+sp-runtime-interface = { git = "https://github.com/paritytech/substrate.git", rev = "f7a8b10" }
 
 # pallets
 frame-system = { git = "https://github.com/paritytech/substrate.git", rev = "f7a8b10" }
