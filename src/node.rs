@@ -295,15 +295,23 @@ impl<T: TestRequirements> Node<T> {
 	pub fn seal_blocks(&mut self, num: usize) {
 		let mut tokio = self._compat_runtime.borrow_mut();
 		for count in 0..num {
+			let (sender, future_block) = futures::channel::oneshot::channel();
 			let future = self.manual_seal_command_sink.send(EngineCommand::SealNewBlock {
 				create_empty: true,
 				finalize: false,
 				parent_hash: None,
-				sender: None,
+				sender: Some(sender),
 			});
 
-			tokio.block_on_std(future).expect("block production failed: ");
-			log::info!("sealed {} of {} blocks", count + 1, num)
+			tokio.block_on_std(async {
+				const ERROR: &'static str = "manual-seal authorship task is shutting down";
+				future.await.expect(ERROR);
+
+				match future_block.await.expect(ERROR) {
+					Ok(block) => log::info!("sealed {} (hash: {}) of {} blocks", count + 1, block.hash, num),
+					Err(err) => log::error!("failed to seal block {} of {}, error: {:?}", count + 1, num, err),
+				}
+			});
 		}
 	}
 

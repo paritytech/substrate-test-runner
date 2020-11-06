@@ -125,6 +125,7 @@ where
 		"ws",
 		"sc_network",
 		"sc_service",
+		"sc_basic_authorship",
 		"sc_peerset",
 		"rpc",
 	];
