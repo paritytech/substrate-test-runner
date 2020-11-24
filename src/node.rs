@@ -1,6 +1,6 @@
 use std::{cell::RefCell, sync::Arc};
 
-use futures::{FutureExt, SinkExt};
+use futures::{FutureExt, SinkExt, channel::{mpsc, oneshot}};
 use jsonrpc_core::MetaIoHandler;
 use jsonrpc_core_client::{transports::local, RpcChannel};
 use manual_seal::{run_manual_seal, EngineCommand, ManualSealParams};
@@ -37,9 +37,9 @@ pub struct Node<T: TestRequirements> {
 	/// tokio-compat runtime
 	_compat_runtime: RefCell<tokio_compat::runtime::Runtime>,
 	/// Stream of log lines
-	log_stream: futures::channel::mpsc::UnboundedReceiver<String>,
+	log_stream: RefCell<mpsc::UnboundedReceiver<String>>,
 	/// node tokio runtime
-	_runtime: tokio::runtime::Runtime,
+	_runtime: RefCell<tokio::runtime::Runtime>,
 	/// handle to the running node.
 	_task_manager: Option<TaskManager>,
 	/// client instance
@@ -57,7 +57,7 @@ pub struct Node<T: TestRequirements> {
 		>,
 	>,
 	/// channel to communicate with manual seal on.
-	manual_seal_command_sink: futures::channel::mpsc::Sender<EngineCommand<<T::Block as BlockT>::Hash>>,
+	manual_seal_command_sink: RefCell<mpsc::Sender<EngineCommand<<T::Block as BlockT>::Hash>>>,
 	/// backend type.
 	backend: Arc<TFullBackend<T::Block>>,
 	/// Block number at initialization of this Node.
@@ -82,7 +82,7 @@ impl<T: TestRequirements> Node<T> {
 		let tokio_runtime = build_runtime().unwrap();
 
 		// unbounded logs, should be fine, test is shortlived.
-		let (log_sink, log_stream) = futures::channel::mpsc::unbounded();
+		let (log_sink, log_stream) = mpsc::unbounded();
 
 		logger(tokio_runtime.handle().clone(), log_sink);
 		let runtime_handle = tokio_runtime.handle().clone();
@@ -141,7 +141,7 @@ impl<T: TestRequirements> Node<T> {
 		);
 
 		// Channel for the rpc handler to communicate with the authorship task.
-		let (command_sink, commands_stream) = futures::channel::mpsc::channel(10);
+		let (command_sink, commands_stream) = mpsc::channel(10);
 
 		let rpc_handlers = {
 			let params = SpawnTasksParams {
@@ -186,13 +186,13 @@ impl<T: TestRequirements> Node<T> {
 		Ok(Self {
 			rpc_handler,
 			_task_manager: Some(task_manager),
-			_runtime: tokio_runtime,
+			_runtime: RefCell::new(tokio_runtime),
 			_compat_runtime: RefCell::new(compat_runtime),
 			client,
 			pool: transaction_pool,
 			backend,
-			log_stream,
-			manual_seal_command_sink: command_sink,
+			log_stream: RefCell::new(log_stream),
+			manual_seal_command_sink: RefCell::new(command_sink),
 			initial_block_number: initial_number,
 		})
 	}
@@ -277,11 +277,11 @@ impl<T: TestRequirements> Node<T> {
 	}
 
 	/// Checks the node logs for a specific entry.
-	pub fn assert_log_line(&mut self, content: &str) {
+	pub fn assert_log_line(&self, content: &str) {
 		futures::executor::block_on(async {
 			use futures::StreamExt;
 
-			while let Some(log_line) = self.log_stream.next().await {
+			while let Some(log_line) = self.log_stream.borrow_mut().next().await {
 				if log_line.contains(content) {
 					return;
 				}
@@ -292,11 +292,12 @@ impl<T: TestRequirements> Node<T> {
 	}
 
 	/// Instructs manual seal to seal new, possibly empty blocks.
-	pub fn seal_blocks(&mut self, num: usize) {
-		let mut tokio = self._compat_runtime.borrow_mut();
+	pub fn seal_blocks(&self, num: usize) {
+		let (mut tokio, mut sink) = (self._compat_runtime.borrow_mut(), self.manual_seal_command_sink.borrow_mut());
+
 		for count in 0..num {
-			let (sender, future_block) = futures::channel::oneshot::channel();
-			let future = self.manual_seal_command_sink.send(EngineCommand::SealNewBlock {
+			let (sender, future_block) = oneshot::channel();
+			let future = sink.send(EngineCommand::SealNewBlock {
 				create_empty: true,
 				finalize: false,
 				parent_hash: None,
@@ -338,8 +339,8 @@ impl<T: TestRequirements> Node<T> {
 	}
 
 	/// provides access to the tokio runtime.
-	pub fn tokio_runtime(&mut self) -> &mut tokio::runtime::Runtime {
-		&mut self._runtime
+	pub fn tokio_runtime(&self) -> &RefCell<tokio::runtime::Runtime> {
+		&self._runtime
 	}
 }
 
