@@ -16,7 +16,7 @@ pub use host_functions::*;
 pub use node::*;
 
 /// Wrapper trait for concrete type required by this testing framework.
-pub trait TestRequirements: Sized {
+pub trait ChainInfo: Sized {
 	/// Opaque block type
 	type Block: BlockT;
 

@@ -26,12 +26,12 @@ use sp_transaction_pool::runtime_api::TaggedTransactionQueue;
 use sp_transaction_pool::TransactionPool;
 
 pub use crate::utils::{config, logger};
-use crate::TestRequirements;
+use crate::ChainInfo;
 
 /// This holds a reference to a running node on another thread,
 /// the node process is dropped when this struct is dropped
 /// also holds logs from the process.
-pub struct Node<T: TestRequirements> {
+pub struct Node<T: ChainInfo> {
 	/// rpc handler for communicating with the node over rpc.
 	rpc_handler: Arc<MetaIoHandler<sc_rpc::Metadata, sc_rpc_server::RpcMiddleware>>,
 	/// tokio-compat runtime
@@ -64,7 +64,7 @@ pub struct Node<T: TestRequirements> {
 	initial_block_number: NumberFor<T::Block>
 }
 
-impl<T: TestRequirements> Node<T> {
+impl<T: ChainInfo> Node<T> {
 	/// Starts a node with the manual-seal authorship,
 	pub fn new() -> Result<Self, sc_service::Error>
 	where
@@ -344,7 +344,7 @@ impl<T: TestRequirements> Node<T> {
 	}
 }
 
-impl<T: TestRequirements> Drop for Node<T> {
+impl<T: ChainInfo> Drop for Node<T> {
 	fn drop(&mut self) {
         // if a db path was specified, revert all blocks we've added
 		if let Some(_) = T::base_path() {

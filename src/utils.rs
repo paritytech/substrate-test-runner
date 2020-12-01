@@ -1,4 +1,4 @@
-use crate::TestRequirements;
+use crate::ChainInfo;
 use futures::{Sink, SinkExt};
 use sc_client_api::execution_extensions::ExecutionStrategies;
 use sc_executor::WasmExecutionMethod;
@@ -16,7 +16,7 @@ use std::io::Write;
 /// Used to create `Configuration` object for the node.
 pub fn config<Node>(task_executor: TaskExecutor) -> Configuration
 where
-	Node: TestRequirements,
+	Node: ChainInfo,
 {
 	let mut chain_spec = Node::load_spec().expect("failed to load chain specification");
 	let base_path = if let Some(base) = Node::base_path() {
