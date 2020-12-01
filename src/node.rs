@@ -126,8 +126,6 @@ impl<T: ChainInfo> Node<T> {
 				import_queue,
 				on_demand: None,
 				block_announce_validator_builder: None,
-				finality_proof_request_builder: None,
-				finality_proof_provider: None,
 			};
 			build_network(params)?
 		};
@@ -241,16 +239,16 @@ impl<T: ChainInfo> Node<T> {
 	/// submit some extrinsic to the node, providing the sending account.
 	pub fn submit_extrinsic(
 		&self,
-		call: impl Into<<T::Runtime as frame_system::Trait>::Call>,
-		from: <T::Runtime as frame_system::Trait>::AccountId,
+		call: impl Into<<T::Runtime as frame_system::Config>::Call>,
+		from: <T::Runtime as frame_system::Config>::AccountId,
 	) -> <T::Block as BlockT>::Hash
 	where
-		<T::Runtime as frame_system::Trait>::AccountId: Encode,
-		<T::Runtime as frame_system::Trait>::Call: Encode,
+		<T::Runtime as frame_system::Config>::AccountId: Encode,
+		<T::Runtime as frame_system::Config>::Call: Encode,
 		<T::Block as BlockT>::Extrinsic: From<
 			UncheckedExtrinsic<
-				<T::Runtime as frame_system::Trait>::AccountId,
-				<T::Runtime as frame_system::Trait>::Call,
+				<T::Runtime as frame_system::Config>::AccountId,
+				<T::Runtime as frame_system::Config>::Call,
 				MultiSignature,
 				T::SignedExtras,
 			>,
@@ -259,8 +257,8 @@ impl<T: ChainInfo> Node<T> {
 		let extra = self.with_state(|| T::signed_extras(from.clone()));
 		let signed_data = Some((from, Default::default(), extra));
 		let ext = UncheckedExtrinsic::<
-			<T::Runtime as frame_system::Trait>::AccountId,
-			<T::Runtime as frame_system::Trait>::Call,
+			<T::Runtime as frame_system::Config>::AccountId,
+			<T::Runtime as frame_system::Config>::Call,
 			MultiSignature,
 			T::SignedExtras,
 		>::new(call.into(), signed_data)

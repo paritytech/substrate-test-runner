@@ -24,7 +24,7 @@ pub trait ChainInfo: Sized {
 	type Executor: NativeExecutionDispatch + 'static;
 
 	/// Runtime
-	type Runtime: frame_system::Trait;
+	type Runtime: frame_system::Config;
 
 	/// RuntimeApi
 	type RuntimeApi: Send
@@ -56,7 +56,7 @@ pub trait ChainInfo: Sized {
 	}
 
 	/// Signed extras, this function is caled in an externalities provided environment.
-	fn signed_extras(from: <Self::Runtime as frame_system::Trait>::AccountId) -> Self::SignedExtras;
+	fn signed_extras(from: <Self::Runtime as frame_system::Config>::AccountId) -> Self::SignedExtras;
 
 	/// Attempt to create client parts, including block import,
 	/// select chain strategy and consensus data provider.

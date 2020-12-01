@@ -16,7 +16,7 @@ The test runner provides two api'ss of note
 
     This tells manual seal authorship task running on the node to author `count` number of blocks, including any transactions in the transaction pool in those blocks.
 
--   `submit_extrinsic<T: frame_system::Trait>(call: Impl Into<T::Call>, from: T::AccountId)`
+-   `submit_extrinsic<T: frame_system::Config>(call: Impl Into<T::Call>, from: T::AccountId)`
     <br/>
 
     Providing a `Call` and an `AccountId`, creates an `UncheckedExtrinsic` with an empty signature and sends to the node to be included in future block.
@@ -80,7 +80,7 @@ impl TestRequirements for Requirements {
 
     /// Create your signed extras here.
 	fn signed_extras(
-		from: <Self::Runtime as frame_system::Trait>::AccountId,
+		from: <Self::Runtime as frame_system::Config>::AccountId,
 	) -> Self::SignedExtension
 	where
 		S: StateProvider
