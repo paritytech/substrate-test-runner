@@ -26,7 +26,7 @@ use sc_network::{
 	multiaddr,
 };
 use sc_service::config::KeystoreConfig;
-use sc_service::{BasePath, Configuration, DatabaseConfig, Role, TaskExecutor};
+use sc_service::{BasePath, Configuration, DatabaseConfig, Role, TaskExecutor, KeepBlocks, TransactionStorageMode};
 use sp_keyring::Sr25519Keyring;
 use std::fmt;
 use std::io::Write;
@@ -88,7 +88,6 @@ where
 		},
 		state_cache_size: 16777216,
 		state_cache_child_ratio: None,
-		pruning: Default::default(),
 		chain_spec,
 		wasm_method: WasmExecutionMethod::Interpreted,
 		// NOTE: we enforce the use of the wasm runtime to make use of the signature overrides
@@ -122,6 +121,9 @@ where
 		informant_output_format,
 		disable_log_reloading: false,
 		keystore_remote: None,
+		keep_blocks: KeepBlocks::All,
+		state_pruning: Default::default(),
+		transaction_storage: TransactionStorageMode::BlockBody,
 	}
 }
 
