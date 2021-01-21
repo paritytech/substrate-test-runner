@@ -103,4 +103,7 @@ pub trait ChainInfo: Sized {
 		),
 		sc_service::Error,
 	>;
+
+	/// Given a call and a handle to the node, execute the call with root privileges.
+	fn dispatch_with_root(call: <Self::Runtime as frame_system::Config>::Call, node: &Node<Self>);
 }

@@ -370,15 +370,30 @@ impl<T: ChainInfo> Node<T> {
 	pub fn tokio_runtime(&self) -> &RefCell<tokio::runtime::Runtime> {
 		&self._runtime
 	}
-}
 
-impl<T: ChainInfo> Drop for Node<T> {
-	fn drop(&mut self) {
-        // if a db path was specified, revert all blocks we've added
+	/// Revert all blocks added since creation of the node
+	pub fn clean(&self) {
+		// if a db path was specified, revert all blocks we've added
 		if let Some(_) = T::base_path() {
 			let diff = self.client.info().best_number - self.initial_block_number;
 			self.revert_blocks(diff);
 		}
+	}
+
+	/// Performs a runtime upgrade given a wasm blob
+	pub fn upgrade_runtime(&self, wasm: Vec<u8>)
+		where
+			<T::Runtime as frame_system::Config>::Call: From<frame_system::Call<T::Runtime>>
+	{
+		let call = frame_system::Call::set_code(wasm);
+		T::dispatch_with_root(call.into(), &self);
+	}
+}
+
+impl<T: ChainInfo> Drop for Node<T> {
+	fn drop(&mut self) {
+		self.clean();
+
 		if let Some(mut task_manager) = self._task_manager.take() {
 			// if this isn't called the node will live forever
 			task_manager.terminate()
