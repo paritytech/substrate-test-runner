@@ -1,12 +1,11 @@
-
 //! End to end runtime tests
 
 use substrate_test_runner::{Node, ChainInfo, SignatureVerificationOverride};
-use grandpa::GrandpaBlockImport;
+use sc_finality_grandpa::GrandpaBlockImport;
 use sc_service::{TFullBackend, TFullClient, Configuration, TaskManager, new_full_parts};
-use node_runtime::{SignedExtra, Runtime, Call, Event};
+use node_runtime::SignedExtra;
 use sp_runtime::generic::Era;
-use std::{sync::Arc, str::FromStr};
+use std::sync::Arc;
 use sp_inherents::InherentDataProviders;
 use sc_consensus_babe::BabeBlockImport;
 use sp_keystore::SyncCryptoStorePtr;
@@ -14,7 +13,6 @@ use sp_keyring::sr25519::Keyring::Alice;
 use node_cli::chain_spec::development_config;
 use sp_consensus_babe::AuthorityId;
 use manual_seal::{ConsensusDataProvider, consensus::babe::BabeConsensusDataProvider};
-use sp_runtime::AccountId32;
 
 type BlockImport<B, BE, C, SC> = BabeBlockImport<B, C, GrandpaBlockImport<BE, B, C, SC>>;
 
@@ -91,7 +89,7 @@ impl ChainInfo for NodeTemplateChainInfo {
 		let select_chain = sc_consensus::LongestChain::new(backend.clone());
 
 		let (grandpa_block_import, ..) =
-			grandpa::block_import(client.clone(), &(client.clone() as Arc<_>), select_chain.clone())?;
+			sc_finality_grandpa::block_import(client.clone(), &(client.clone() as Arc<_>), select_chain.clone())?;
 
 		let (block_import, babe_link) = sc_consensus_babe::block_import(
 			sc_consensus_babe::Config::get_or_compute(&*client)?,
@@ -118,5 +116,13 @@ impl ChainInfo for NodeTemplateChainInfo {
 			select_chain,
 			block_import,
 		))
+	}
+
+	fn dispatch_with_root(call: node_runtime::Call, node: &Node<Self>) {
+		use sp_runtime::traits::IdentifyAccount;
+		let alice = sp_runtime::MultiSigner::from(Alice.public()).into_account();
+		let call = pallet_sudo::Call::sudo(Box::new(call)); // :D
+		node.submit_extrinsic(call, alice);
+		node.seal_blocks(1);
 	}
 }

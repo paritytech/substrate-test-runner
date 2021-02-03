@@ -55,5 +55,13 @@ tokio-compat = { version = "0.1.6", features = ["rt-full"] }
 
 [dev-dependencies]
 node-runtime = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
+node-primitives = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
 node-cli = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
 sc-consensus-babe = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
+sc-consensus = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
+sc-finality-grandpa = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
+sp-consensus-babe = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
+pallet-transaction-payment = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
+pallet-sudo = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
+
+

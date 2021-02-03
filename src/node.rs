@@ -22,7 +22,6 @@ use futures::{FutureExt, SinkExt, channel::{mpsc, oneshot}};
 use jsonrpc_core::MetaIoHandler;
 use jsonrpc_core_client::{transports::local, RpcChannel};
 use manual_seal::{run_manual_seal, EngineCommand, ManualSealParams};
-use parity_scale_codec::Encode;
 use sc_cli::build_runtime;
 use sc_client_api::{backend, backend::Backend, CallExecutor, ExecutorProvider};
 use sc_service::{
@@ -260,8 +259,6 @@ impl<T: ChainInfo> Node<T> {
 		from: <T::Runtime as frame_system::Config>::AccountId,
 	) -> <T::Block as BlockT>::Hash
 	where
-		<T::Runtime as frame_system::Config>::AccountId: Encode,
-		<T::Runtime as frame_system::Config>::Call: Encode,
 		<T::Block as BlockT>::Extrinsic: From<
 			UncheckedExtrinsic<
 				MultiAddress<
