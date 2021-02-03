@@ -33,7 +33,7 @@ use sc_transaction_pool::BasicPool;
 use sp_api::{ApiErrorExt, ApiExt, ConstructRuntimeApi, Core, Metadata, OverlayedChanges, StorageTransactionCache};
 use sp_block_builder::BlockBuilder;
 use sp_blockchain::HeaderBackend;
-use sp_core::{offchain::storage::OffchainOverlayedChanges, ExecutionContext};
+use sp_core::ExecutionContext;
 use sp_offchain::OffchainWorkerApi;
 use sp_runtime::traits::{Block as BlockT, Extrinsic};
 use sp_runtime::{generic::BlockId, transaction_validity::TransactionSource, MultiSignature, MultiAddress};
@@ -161,7 +161,7 @@ impl<T: ChainInfo> Node<T> {
 		// Channel for the rpc handler to communicate with the authorship task.
 		let (command_sink, commands_stream) = mpsc::channel(10);
 
-		let rpc_handlers = {
+		let (rpc_handlers, _) = {
 			let params = SpawnTasksParams {
 				config,
 				client: client.clone(),
@@ -175,7 +175,6 @@ impl<T: ChainInfo> Node<T> {
 				network,
 				network_status_sinks,
 				system_rpc_tx,
-				telemetry_connection_sinks: Default::default(),
 			};
 			spawn_tasks(params)?
 		};
@@ -231,7 +230,6 @@ impl<T: ChainInfo> Node<T> {
 		<TFullCallExecutor<T::Block, T::Executor> as CallExecutor<T::Block>>::Error: std::fmt::Debug,
 	{
 		let id = BlockId::Hash(self.client.info().best_hash);
-		let mut offchain_overlay = OffchainOverlayedChanges::disabled();
 		let mut overlay = OverlayedChanges::default();
 		let changes_trie = backend::changes_tries_state_at_block(&id, self.backend.changes_trie_storage()).unwrap();
 		let mut cache =
@@ -247,7 +245,6 @@ impl<T: ChainInfo> Node<T> {
 
 		let mut ext = Ext::new(
 			&mut overlay,
-			&mut offchain_overlay,
 			&mut cache,
 			&state_backend,
 			changes_trie.clone(),
