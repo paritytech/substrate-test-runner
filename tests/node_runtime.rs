@@ -13,7 +13,7 @@ use sp_keystore::SyncCryptoStorePtr;
 use sp_keyring::sr25519::Keyring::Alice;
 use node_cli::chain_spec::development_config;
 use sp_consensus_babe::AuthorityId;
-use sc_consensus_manual_seal::{ConsensusDataProvider, consensus::babe::BabeConsensusDataProvider};
+use manual_seal::{ConsensusDataProvider, consensus::babe::BabeConsensusDataProvider};
 use sp_runtime::AccountId32;
 
 type BlockImport<B, BE, C, SC> = BabeBlockImport<B, C, GrandpaBlockImport<BE, B, C, SC>>;
