@@ -9,7 +9,7 @@ Allows you to test
 
 This works by running a full node with a ManualSeal-BABE™ hybrid consensus for block authoring.
 
-The test runner provides two api'ss of note
+The test runner provides two apis of note
 
 -   `seal_blocks(count: u32)`
     <br/>
