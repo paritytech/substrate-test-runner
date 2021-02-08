@@ -118,7 +118,7 @@ impl ChainInfo for NodeTemplateChainInfo {
 		))
 	}
 
-	fn dispatch_with_root(call: node_runtime::Call, node: &Node<Self>) {
+	fn dispatch_with_root(call: node_runtime::Call, node: &mut Node<Self>) {
 		use sp_runtime::traits::IdentifyAccount;
 		let alice = sp_runtime::MultiSigner::from(Alice.public()).into_account();
 		let call = pallet_sudo::Call::sudo(Box::new(call)); // :D

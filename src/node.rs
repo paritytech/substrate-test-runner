@@ -16,7 +16,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use std::{cell::RefCell, sync::Arc};
+use std::sync::Arc;
 
 use futures::{FutureExt, SinkExt, channel::{mpsc, oneshot}};
 use jsonrpc_core::MetaIoHandler;
@@ -52,11 +52,11 @@ pub struct Node<T: ChainInfo> {
 	/// rpc handler for communicating with the node over rpc.
 	rpc_handler: Arc<MetaIoHandler<sc_rpc::Metadata, sc_rpc_server::RpcMiddleware>>,
 	/// tokio-compat runtime
-	_compat_runtime: RefCell<tokio_compat::runtime::Runtime>,
+	_compat_runtime: tokio_compat::runtime::Runtime,
 	/// Stream of log lines
-	log_stream: RefCell<mpsc::UnboundedReceiver<String>>,
+	log_stream: mpsc::UnboundedReceiver<String>,
 	/// node tokio runtime
-	_runtime: RefCell<tokio::runtime::Runtime>,
+	_runtime: tokio::runtime::Runtime,
 	/// handle to the running node.
 	_task_manager: Option<TaskManager>,
 	/// client instance
@@ -74,7 +74,7 @@ pub struct Node<T: ChainInfo> {
 		>,
 	>,
 	/// channel to communicate with manual seal on.
-	manual_seal_command_sink: RefCell<mpsc::Sender<EngineCommand<<T::Block as BlockT>::Hash>>>,
+	manual_seal_command_sink: mpsc::Sender<EngineCommand<<T::Block as BlockT>::Hash>>,
 	/// backend type.
 	backend: Arc<TFullBackend<T::Block>>,
 	/// Block number at initialization of this Node.
@@ -202,13 +202,13 @@ impl<T: ChainInfo> Node<T> {
 		Ok(Self {
 			rpc_handler,
 			_task_manager: Some(task_manager),
-			_runtime: RefCell::new(tokio_runtime),
-			_compat_runtime: RefCell::new(compat_runtime),
+			_runtime: tokio_runtime,
+			_compat_runtime: compat_runtime,
 			client,
 			pool: transaction_pool,
 			backend,
-			log_stream: RefCell::new(log_stream),
-			manual_seal_command_sink: RefCell::new(command_sink),
+			log_stream,
+			manual_seal_command_sink: command_sink,
 			initial_block_number: initial_number,
 		})
 	}
@@ -254,7 +254,7 @@ impl<T: ChainInfo> Node<T> {
 
 	/// submit some extrinsic to the node, providing the sending account.
 	pub fn submit_extrinsic(
-		&self,
+		&mut self,
 		call: impl Into<<T::Runtime as frame_system::Config>::Call>,
 		from: <T::Runtime as frame_system::Config>::AccountId,
 	) -> <T::Block as BlockT>::Hash
@@ -285,8 +285,7 @@ impl<T: ChainInfo> Node<T> {
 		.expect("UncheckedExtrinsic::new() always returns Some");
 		let at = self.client.info().best_hash;
 
-		self.compat_runtime()
-			.borrow_mut()
+		self._compat_runtime
 			.block_on_std(
 				self.pool.submit_one(&BlockId::Hash(at), TransactionSource::Local, ext.into()),
 			)
@@ -299,11 +298,11 @@ impl<T: ChainInfo> Node<T> {
 	}
 
 	/// Checks the node logs for a specific entry.
-	pub fn assert_log_line(&self, content: &str) {
+	pub fn assert_log_line(&mut self, content: &str) {
 		futures::executor::block_on(async {
 			use futures::StreamExt;
 
-			while let Some(log_line) = self.log_stream.borrow_mut().next().await {
+			while let Some(log_line) = self.log_stream.next().await {
 				if log_line.contains(content) {
 					return;
 				}
@@ -314,8 +313,8 @@ impl<T: ChainInfo> Node<T> {
 	}
 
 	/// Instructs manual seal to seal new, possibly empty blocks.
-	pub fn seal_blocks(&self, num: usize) {
-		let (mut tokio, mut sink) = (self._compat_runtime.borrow_mut(), self.manual_seal_command_sink.borrow_mut());
+	pub fn seal_blocks(&mut self, num: usize) {
+		let (tokio, sink) = (&mut self._compat_runtime, &mut self.manual_seal_command_sink);
 
 		for count in 0..num {
 			let (sender, future_block) = oneshot::channel();
@@ -346,23 +345,13 @@ impl<T: ChainInfo> Node<T> {
 		use futures01::Future;
 		let rpc_handler = self.rpc_handler.clone();
 		let (client, fut) = local::connect_with_middleware::<C, _, _, _>(rpc_handler);
-		self._compat_runtime.borrow().spawn(fut.map_err(|_| ()));
+		self._compat_runtime.spawn(fut.map_err(|_| ()));
 		client
 	}
 
 	/// Revert count number of blocks from the chain
 	pub fn revert_blocks(&self, count: NumberFor<T::Block>) {
 		self.backend.revert(count, true).expect("Failed to revert blocks: ");
-	}
-
-	/// provides access to the tokio compat runtime.
-	pub fn compat_runtime(&self) -> &RefCell<tokio_compat::runtime::Runtime> {
-		&self._compat_runtime
-	}
-
-	/// provides access to the tokio runtime.
-	pub fn tokio_runtime(&self) -> &RefCell<tokio::runtime::Runtime> {
-		&self._runtime
 	}
 
 	/// Revert all blocks added since creation of the node
@@ -375,12 +364,12 @@ impl<T: ChainInfo> Node<T> {
 	}
 
 	/// Performs a runtime upgrade given a wasm blob
-	pub fn upgrade_runtime(&self, wasm: Vec<u8>)
+	pub fn upgrade_runtime(&mut self, wasm: Vec<u8>)
 		where
 			<T::Runtime as frame_system::Config>::Call: From<frame_system::Call<T::Runtime>>
 	{
 		let call = frame_system::Call::set_code(wasm);
-		T::dispatch_with_root(call.into(), &self);
+		T::dispatch_with_root(call.into(), self);
 	}
 }
 
