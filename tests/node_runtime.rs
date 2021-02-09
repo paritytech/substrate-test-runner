@@ -104,7 +104,7 @@ impl ChainInfo for NodeTemplateChainInfo {
 			babe_link.epoch_changes().clone(),
 			vec![(AuthorityId::from(Alice.public()), 1000)],
 		)
-			.expect("failed to create ConsensusDataProvider");
+			.expect("failed to create ConsensusDataProvider.");
 
 		Ok((
 			client,
