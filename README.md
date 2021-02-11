@@ -7,16 +7,16 @@ Allows you to test
 -   Runtime Upgrades
 -   Pallets and general runtime functionality.
 
-This works by running a full node with a manual-seal™/BABE hybrid consensus for block authoring.
+This works by running a full node with a ManualSeal-BABE™ hybrid consensus for block authoring.
 
 The test runner provides two apis of note
 
--   `produce_blocks(count: u32)`
+-   `seal_blocks(count: u32)`
     <br/>
 
     This tells manual seal authorship task running on the node to author `count` number of blocks, including any transactions in the transaction pool in those blocks.
 
--   `send_extrinsic<T: frame_system::Trait>(call: Impl Into<T::Call>, from: T::AccountId)`
+-   `submit_extrinsic<T: frame_system::Config>(call: Impl Into<T::Call>, from: T::AccountId)`
     <br/>
 
     Providing a `Call` and an `AccountId`, creates an `UncheckedExtrinsic` with an empty signature and sends to the node to be included in future block.
@@ -31,11 +31,11 @@ The running node has no signature verification, which allows us author extrinsic
 
 ```rust
 /// tons of ignored imports
-use substrate_test_runner::{prelude::*, rpc, test, node::{TestRuntimeRequirements, StateProvider}};
+use substrate_test_runner::{TestRequirements, Node};
 
-struct Node;
+struct Requirements;
 
-impl TestRuntimeRequirements for Node {
+impl TestRequirements for Requirements {
     /// Provide a Block type with an OpaqueExtrinsic
     type Block = polkadot_core_primitives::Block;
     /// Provide an Executor type for the runtime
@@ -79,16 +79,13 @@ impl TestRuntimeRequirements for Node {
 	// }
 
     /// Create your signed extras here.
-	fn signed_extras<S>(
-		state: &S,
-		from: <Self::Runtime as frame_system::Trait>::AccountId,
+	fn signed_extras(
+		from: <Self::Runtime as frame_system::Config>::AccountId,
 	) -> Self::SignedExtension
 	where
 		S: StateProvider
 	{
-		let nonce = state.with_state(|| {
-			frame_system::Module::<Self::Runtime>::account_nonce(from)
-		});
+		let nonce = frame_system::Module::<Self::Runtime>::account_nonce(from);
 
 		(
 			frame_system::CheckSpecVersion::<Self::Runtime>::new(),
@@ -171,7 +168,7 @@ impl TestRuntimeRequirements for Node {
 #[test]
 fn simple_balances_test() {
 	// given
-	let mut test = test::deterministic::<Node>();
+	let mut node = Node::<Requirements>::new();
 
 	type Balances = pallet_balances::Module<Runtime>;
 
@@ -182,18 +179,19 @@ fn simple_balances_test() {
     );
 
     /// the function with_state allows us to read state, pretty cool right? :D
-	let old_balance = test.with_state(|| Balances::free_balance(alice_account_id.clone()));
-    
-    let amount = 7825388000000;
+	let old_balance = node.with_state(|| Balances::free_balance(alice_account_id.clone()));
+
+    // 70 dots
+    let amount = 70_000_000_000_000;
 
     /// Send extrinsic in action.
-	test.send_extrinsic(BalancesCall::transfer(bob_acount_id.clone(), amount), alice_account_id.clone());
+	node.submit_extrinsic(BalancesCall::transfer(bob_acount_id.clone(), amount), alice_account_id.clone());
 
     /// Produce blocks in action, Powered by manual-seal™.
-	test.produce_blocks(1);
+	node.seal_blocks(1);
 
     /// we can check the new state :D
-	let new_balance = test.with_state(|| Balances::free_balance(alice_account_id));
+	let new_balance = node.with_state(|| Balances::free_balance(alice_account_id));
 
     /// we can now make assertions on how state has changed.
 	assert_eq!(old_balance + amount, new_balance);
