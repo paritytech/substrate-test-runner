@@ -29,7 +29,7 @@ use sc_service::{
 	TaskManager, TaskType,
 };
 use sc_transaction_pool::BasicPool;
-use sp_api::{ApiErrorExt, ApiExt, ConstructRuntimeApi, Core, Metadata, OverlayedChanges, StorageTransactionCache};
+use sp_api::{ApiExt, ConstructRuntimeApi, Core, Metadata, OverlayedChanges, StorageTransactionCache};
 use sp_block_builder::BlockBuilder;
 use sp_blockchain::HeaderBackend;
 use sp_core::ExecutionContext;
@@ -94,7 +94,6 @@ impl<T: ChainInfo> Node<T> {
 				+ SessionKeys<T::Block>
 				+ TaggedTransactionQueue<T::Block>
 				+ BlockBuilder<T::Block>
-				+ ApiErrorExt<Error = sp_blockchain::Error>
 				+ ApiExt<T::Block, StateBackend = <TFullBackend<T::Block> as Backend<T::Block>>::State>,
 	{
 		let compat_runtime = tokio_compat::runtime::Runtime::new().unwrap();
