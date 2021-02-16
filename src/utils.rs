@@ -44,9 +44,6 @@ where
 	};
 	let root_path = base_path.path().to_path_buf().join("chains").join(chain_spec.id());
 
-	let role = Role::Authority {
-		sentry_nodes: Vec::new(),
-	};
 	let key_seed = Sr25519Keyring::Alice.to_seed();
 	let storage = chain_spec
 		.as_storage_builder()
@@ -74,7 +71,7 @@ where
 	Configuration {
 		impl_name: "test-node".to_string(),
 		impl_version: "0.1".to_string(),
-		role,
+		role: Role::Authority,
 		task_executor,
 		transaction_pool: Default::default(),
 		network: network_config,
