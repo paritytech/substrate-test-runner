@@ -6,39 +6,39 @@ edition = "2018"
 
 [dependencies]
 # client deps
-sc-executor = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-service = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-informant = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-network = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-cli = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-basic-authorship = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-rpc = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-transaction-pool = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-transaction-graph = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-client-api = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-rpc-server = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-manual-seal = { package = "sc-consensus-manual-seal", git = "https://github.com/paritytech/substrate.git", branch = "master" }
+sc-executor = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sc-service = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sc-informant = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sc-network = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sc-cli = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sc-basic-authorship = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sc-rpc = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sc-transaction-pool = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sc-transaction-graph = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sc-client-api = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sc-rpc-server = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+manual-seal = { package = "sc-consensus-manual-seal", git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
 
 # primitive deps
-sp-core = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-blockchain = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-block-builder = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-api = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-transaction-pool = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-consensus = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-keystore = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-runtime = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-session = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-offchain = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-inherents = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-keyring = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-externalities = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-state-machine = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-wasm-interface = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-runtime-interface = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
+sp-core = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sp-blockchain = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sp-block-builder = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sp-api = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sp-transaction-pool = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sp-consensus = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sp-keystore = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sp-runtime = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sp-session = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sp-offchain = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sp-inherents = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sp-keyring = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sp-externalities = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sp-state-machine = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sp-wasm-interface = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sp-runtime-interface = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
 
 # pallets
-frame-system = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
+frame-system = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
 
 parity-scale-codec = "1.3.1"
 env_logger = "0.7.1"
@@ -54,14 +54,12 @@ jsonrpc-core = "15.1"
 tokio-compat = { version = "0.1.6", features = ["rt-full"] }
 
 [dev-dependencies]
-node-runtime = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-node-primitives = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-node-cli = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-consensus-babe = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-consensus = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sc-finality-grandpa = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-sp-consensus-babe = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-pallet-transaction-payment = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-pallet-sudo = { git = "https://github.com/paritytech/substrate.git", branch = "master" }
-
-
+node-runtime = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+node-primitives = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+node-cli = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sc-consensus-babe = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sc-consensus = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sc-finality-grandpa = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+sp-consensus-babe = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+pallet-transaction-payment = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }
+pallet-sudo = { git = "https://github.com/paritytech/substrate.git", branch = "kiz-election-provider-2-two-phase-unsigned" }

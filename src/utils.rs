@@ -122,7 +122,6 @@ where
 		state_pruning: Default::default(),
 		transaction_storage: TransactionStorageMode::BlockBody,
 		telemetry_handle: Default::default(),
-		telemetry_span: Default::default()
 	}
 }
 

@@ -174,6 +174,7 @@ impl<T: ChainInfo> Node<T> {
 				network,
 				network_status_sinks,
 				system_rpc_tx,
+				telemetry_span: None
 			};
 			spawn_tasks(params)?
 		};
