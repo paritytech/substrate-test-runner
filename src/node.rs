@@ -126,7 +126,7 @@ impl<T: ChainInfo> Node<T> {
 		) = T::create_client_parts(&config)?;
 
 		let import_queue =
-			manual_seal::import_queue(Box::new(block_import.clone()), &task_manager.spawn_handle(), None);
+			manual_seal::import_queue(Box::new(block_import.clone()), &task_manager.spawn_essential_handle(), None);
 
 		let transaction_pool = BasicPool::new_full(
 			config.transaction_pool.clone(),
@@ -174,6 +174,7 @@ impl<T: ChainInfo> Node<T> {
 				network,
 				network_status_sinks,
 				system_rpc_tx,
+				telemetry_span: None
 			};
 			spawn_tasks(params)?
 		};
