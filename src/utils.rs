@@ -46,6 +46,7 @@ where
 		"sc_network",
 		"sc_service",
 		"sc_basic_authorship",
+		"telemetry-logger",
 		"sc_peerset",
 		"rpc",
 	];
@@ -66,7 +67,7 @@ where
 	builder.filter_module("babe", log::LevelFilter::Info);
 	builder.filter_module("sc_service", log::LevelFilter::Trace);
 	for module in &ignore {
-		builder.filter_module(module, log::LevelFilter::Info);
+		builder.filter_module(module, log::LevelFilter::Off);
 	}
 	let _ = builder.is_test(true).try_init();
 }

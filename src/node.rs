@@ -136,7 +136,7 @@ impl<T: ChainInfo> Node<T> {
 			client.clone(),
 		);
 
-		let (network, network_status_sinks, system_rpc_tx, _network_starter) = {
+		let (network, network_status_sinks, system_rpc_tx, network_starter) = {
 			let params = BuildNetworkParams {
 				config: &config,
 				client: client.clone(),
@@ -196,6 +196,7 @@ impl<T: ChainInfo> Node<T> {
 			.spawn_essential_handle()
 			.spawn("manual-seal", authorship_future);
 
+		network_starter.start_network();
 		let rpc_handler = rpc_handlers.io_handler();
 		let initial_number = client.info().best_number;
 

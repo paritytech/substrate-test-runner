@@ -222,3 +222,15 @@ impl ChainInfo for NodeTemplateChainInfo {
 		node.seal_blocks(1);
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use substrate_test_runner::Node;
+
+	#[test]
+	fn it_works() {
+		let mut node = Node::<NodeTemplateChainInfo>::new().unwrap();
+		node.seal_blocks(10);
+	}
+}
