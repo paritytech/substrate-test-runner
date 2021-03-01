@@ -42,7 +42,7 @@ use sp_state_machine::Ext;
 use sp_transaction_pool::runtime_api::TaggedTransactionQueue;
 use sp_transaction_pool::TransactionPool;
 
-pub use crate::utils::{config, logger};
+pub use crate::utils::{logger, base_path};
 use crate::ChainInfo;
 
 /// This holds a reference to a running node on another thread,
@@ -112,7 +112,7 @@ impl<T: ChainInfo> Node<T> {
 				.map(drop),
 		};
 
-		let config = config::<T>(task_executor.into());
+		let config = T::configuration(task_executor.into());
 
 		let (
 			client,
@@ -136,7 +136,7 @@ impl<T: ChainInfo> Node<T> {
 			client.clone(),
 		);
 
-		let (network, network_status_sinks, system_rpc_tx, network_starter) = {
+		let (network, network_status_sinks, system_rpc_tx, _network_starter) = {
 			let params = BuildNetworkParams {
 				config: &config,
 				client: client.clone(),
@@ -196,7 +196,6 @@ impl<T: ChainInfo> Node<T> {
 			.spawn_essential_handle()
 			.spawn("manual-seal", authorship_future);
 
-		network_starter.start_network();
 		let rpc_handler = rpc_handlers.io_handler();
 		let initial_number = client.info().best_number;
 
@@ -358,7 +357,7 @@ impl<T: ChainInfo> Node<T> {
 	/// Revert all blocks added since creation of the node
 	pub fn clean(&self) {
 		// if a db path was specified, revert all blocks we've added
-		if let Some(_) = T::base_path() {
+		if let Some(_) = base_path() {
 			let diff = self.client.info().best_number - self.initial_block_number;
 			self.revert_blocks(diff);
 		}

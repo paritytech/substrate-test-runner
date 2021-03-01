@@ -18,7 +18,7 @@
 
 use manual_seal::consensus::ConsensusDataProvider;
 use sc_executor::NativeExecutionDispatch;
-use sc_service::{ChainSpec, Configuration, TFullBackend, TFullClient, TaskManager};
+use sc_service::{Configuration, TFullBackend, TFullClient, TaskManager, TaskExecutor};
 use sp_api::{ConstructRuntimeApi, TransactionFor};
 use sp_consensus::{BlockImport, SelectChain};
 use sp_inherents::InherentDataProviders;
@@ -65,13 +65,8 @@ pub trait ChainInfo: Sized {
 
 	type SignedExtras: SignedExtension;
 
-	/// chain spec factory
-	fn load_spec() -> Result<Box<dyn ChainSpec>, String>;
-
-	/// Get polkadot base path from env.
-	fn base_path() -> Option<String> {
-		std::env::var("DB_BASE_PATH").ok()
-	}
+	/// construct the node configuration
+	fn configuration(task_executor: TaskExecutor) -> Configuration;
 
 	/// Signed extras, this function is caled in an externalities provided environment.
 	fn signed_extras(from: <Self::Runtime as frame_system::Config>::AccountId) -> Self::SignedExtras;
