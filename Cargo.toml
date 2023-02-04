@@ -46,7 +46,7 @@ log = "0.4.8"
 futures01 = { package = "futures", version = "0.1.29" }
 futures = { package = "futures", version = "0.3", features = ["compat"] }
 rand = "0.7"
-tokio = { version = "0.2", features = ["full"] }
+tokio = { version = "1.16", features = ["full"] }
 
 # Calling RPC
 jsonrpc-core-client = { version = "15.1", features = ["ws"] }
